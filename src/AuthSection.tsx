@@ -25,12 +25,13 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
     if (mode === 'register') {
       const { error } = await supabase.auth.signUp({
         email,
-        password
-      }, {
-        data: {
-          parentName,
-          childName,
-          childAge: childAge ? Number(childAge) : null
+        password,
+        options: {
+          data: {
+            parentName,
+            childName,
+            childAge: childAge ? Number(childAge) : null
+          }
         }
       });
 
