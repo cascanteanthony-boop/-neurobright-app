@@ -1,33 +1,91 @@
 import { useEffect, useState } from 'react';
+import type { User } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import WelcomeScreen from './WelcomeScreen';
 import AuthSection from './AuthSection';
 import NavShell from './NavShell';
+import Questionnaire from './Questionnaire';
+import type { UserMetadata } from './types';
 
-export type AppView = 'welcome' | 'auth' | 'home';
+export type AppView = 'welcome' | 'auth' | 'questionnaire' | 'home';
 
 function App() {
   const [view, setView] = useState<AppView>('welcome');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [user, setUser] = useState<User | null>(null);
+  const [userMetadata, setUserMetadata] = useState<UserMetadata>({});
+
+  const refreshUser = async () => {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user) {
+      setUser(null);
+      setUserMetadata({});
+      return null;
+    }
+
+    setUser(data.user);
+    const metadata = {
+      ...(data.user.user_metadata ?? {}),
+      parentEmail: data.user.email ?? undefined
+    } as UserMetadata;
+    setUserMetadata(metadata);
+    return data.user;
+  };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    const initializeSession = async () => {
+      const { data } = await supabase.auth.getSession();
       if (data.session) {
-        setView('home');
+        const user = await refreshUser();
+        const metadata = (user?.user_metadata ?? {}) as UserMetadata;
+        setView(metadata.questionnaireCompleted ? 'home' : 'questionnaire');
       }
-    });
+    };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    initializeSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session) {
-        setView('home');
+        const user = await refreshUser();
+        const metadata = (user?.user_metadata ?? {}) as UserMetadata;
+        setView(metadata.questionnaireCompleted ? 'home' : 'questionnaire');
+      } else {
+        setUser(null);
+        setUserMetadata({});
+        setAuthMode('login');
+        setView('welcome');
       }
     });
 
     return () => subscription?.unsubscribe();
   }, []);
 
+  const handleAuthSuccess = async () => {
+    const user = await refreshUser();
+    if (!user) {
+      setView('auth');
+      return;
+    }
+
+    const metadata = (user.user_metadata ?? {}) as UserMetadata;
+    if (authMode === 'register' || !metadata.questionnaireCompleted) {
+      setView('questionnaire');
+      return;
+    }
+
+    setView('home');
+  };
+
+  const handleQuestionnaireComplete = (metadata: UserMetadata) => {
+    setUserMetadata(metadata);
+    setView('home');
+  };
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    setUser(null);
+    setUserMetadata({});
+    setAuthMode('login');
     setView('auth');
   };
 
@@ -45,15 +103,21 @@ function App() {
           }}
         />
       )}
+
       {view === 'auth' && (
         <AuthSection
           mode={authMode}
           onModeChange={setAuthMode}
-          onSuccess={() => setView('home')}
+          onSuccess={handleAuthSuccess}
           onBack={() => setView('welcome')}
         />
       )}
-      {view === 'home' && <NavShell onSignOut={handleSignOut} />}
+
+      {view === 'questionnaire' && (
+        <Questionnaire userMetadata={userMetadata} onComplete={handleQuestionnaireComplete} />
+      )}
+
+      {view === 'home' && <NavShell userMetadata={userMetadata} onSignOut={handleSignOut} />}
     </div>
   );
 }

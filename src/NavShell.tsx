@@ -1,18 +1,12 @@
 import { useState } from 'react';
+import type { UserMetadata } from './types';
 
 type Tab = 'inicio' | 'perfil' | 'actividades' | 'progreso' | 'cuenta';
 
 interface NavShellProps {
   onSignOut: () => void;
+  userMetadata: UserMetadata;
 }
-
-const tabLabels: Record<Tab, string> = {
-  inicio: 'Inicio',
-  perfil: 'Perfil',
-  actividades: 'Actividades',
-  progreso: 'Progreso',
-  cuenta: 'Cuenta'
-};
 
 type Category = 'Todas' | 'Atención' | 'Calma' | 'Sensorial' | 'Emociones' | 'Aprendizaje';
 
@@ -75,19 +69,6 @@ const activitiesData = [
   }
 ];
 
-const profileAreas = [
-  { label: 'Atención', value: 85 },
-  { label: 'Hiperactividad', value: 70 },
-  { label: 'Espectro Autista', value: 55 },
-  { label: 'Sensorial', value: 80 },
-  { label: 'Emocional', value: 65 },
-  { label: 'Aprendizaje', value: 75 },
-  { label: 'Altas Capacidades', value: 60 }
-];
-
-const strengths = ['Creatividad', 'Pensamiento visual', 'Memoria musical'];
-const supportAreas = ['Organización', 'Autorregulación', 'Transiciones'];
-
 const activityItems = [
   {
     icon: '🎨',
@@ -106,19 +87,47 @@ const activityItems = [
   }
 ];
 
-export default function NavShell({ onSignOut }: NavShellProps) {
+const tabLabels: Record<Tab, string> = {
+  inicio: 'Inicio',
+  perfil: 'Perfil',
+  actividades: 'Actividades',
+  progreso: 'Progreso',
+  cuenta: 'Cuenta'
+};
+
+export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
   const [activeTab, setActiveTab] = useState<Tab>('inicio');
   const [activityFilter, setActivityFilter] = useState<Category>('Todas');
-  const userName = 'Ana';
-  const parentName = 'Clara Ruiz';
-  const parentEmail = 'clara@example.com';
-  const childName = 'Mateo';
+  const childName = userMetadata.childName ?? 'tu hijo/a';
+  const parentName = userMetadata.parentName ?? 'Cuenta familiar';
+  const parentEmail = userMetadata.parentEmail ?? 'Correo no registrado';
+  const childAge = userMetadata.childAge ?? undefined;
+  const childProfile = userMetadata.childProfile ?? 'Perfil en evaluación';
   const today = new Date();
   const formattedDate = today.toLocaleDateString('es-ES', {
     weekday: 'long',
     day: 'numeric',
     month: 'long'
   });
+
+  const profileAnswers = userMetadata.questionnaireAnswers ?? {};
+  const profileAreaValues = [
+    { label: 'Atención', value: (profileAnswers.attention ?? 0) * 20 },
+    { label: 'Comportamiento', value: (profileAnswers.behavior ?? 0) * 20 },
+    { label: 'Comunicación', value: (profileAnswers.communication ?? 0) * 20 },
+    { label: 'Sensorial', value: (profileAnswers.sensory ?? 0) * 20 },
+    { label: 'Emociones', value: (profileAnswers.emotions ?? 0) * 20 },
+    { label: 'Aprendizaje', value: (profileAnswers.learning ?? 0) * 20 }
+  ];
+
+  const strengths = ['Observación consciente', 'Curiosidad natural', 'Pensamiento creativo'];
+  const supportAreas = ['Rutinas claras', 'Pausas sensoriales', 'Apoyo emocional'];
+
+  const dashboardObjective = childProfile.includes('Atención')
+    ? 'Mejorar foco y organización'
+    : childProfile.includes('Emociones')
+    ? 'Apoyar la regulación emocional'
+    : 'Potenciar sus habilidades únicas';
 
   const filteredActivities =
     activityFilter === 'Todas'
@@ -132,12 +141,13 @@ export default function NavShell({ onSignOut }: NavShellProps) {
   const improvement = 18;
   const weekLabel = weekOffset === 0 ? 'Semana actual' : `Semana -${weekOffset}`;
   const weekDays = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+  const childInitial = childName.trim().charAt(0).toUpperCase() || 'H';
 
   return (
     <div className="dashboard-shell">
       <div className="dashboard-header">
         <div>
-          <p className="dashboard-greeting">Hola {userName}, aquí el resumen de {childName}</p>
+          <p className="dashboard-greeting">Hola, aquí el resumen de {childName}</p>
           <h1>
             {activeTab === 'actividades'
               ? 'Actividades de hoy'
@@ -290,21 +300,23 @@ export default function NavShell({ onSignOut }: NavShellProps) {
       ) : activeTab === 'perfil' ? (
         <section className="profile-screen">
           <div className="profile-header">
-            <div className="profile-avatar">M</div>
+            <div className="profile-avatar">{childInitial}</div>
             <div>
               <h2>{childName}</h2>
-              <p className="profile-meta">8 años</p>
-              <span className="condition-badge">TDAH Combinado</span>
+              <p className="profile-meta">{childAge ? `${childAge} años` : 'Edad no registrada'}</p>
+              <span className="condition-badge">{childProfile}</span>
             </div>
           </div>
 
           <section className="neurocard">
             <div className="card-header">
-              <p className="eyebrow">Perfil neurodivergente</p>
-              <h2>Niveles de intensidad por área</h2>
+              <div>
+                <p className="eyebrow">Perfil neurodivergente</p>
+                <h2>Resultados del cuestionario</h2>
+              </div>
             </div>
             <div className="bar-list">
-              {profileAreas.map((area) => (
+              {profileAreaValues.map((area) => (
                 <div key={area.label} className="bar-row">
                   <span className="bar-label">{area.label}</span>
                   <div className="bar-track">
@@ -354,16 +366,8 @@ export default function NavShell({ onSignOut }: NavShellProps) {
             </div>
             <ul className="history-list">
               <li className="history-item">
-                <strong>Evaluación emocional</strong>
-                <span>24 may 2026</span>
-              </li>
-              <li className="history-item">
-                <strong>Registro sensorial</strong>
-                <span>18 may 2026</span>
-              </li>
-              <li className="history-item">
-                <strong>Control de atención</strong>
-                <span>11 may 2026</span>
+                <strong>Cuestionario inicial</strong>
+                <span>Reciente</span>
               </li>
             </ul>
           </section>
@@ -371,7 +375,7 @@ export default function NavShell({ onSignOut }: NavShellProps) {
       ) : activeTab === 'cuenta' ? (
         <section className="account-screen">
           <div className="account-header">
-            <div className="account-avatar">CR</div>
+            <div className="account-avatar">{parentName.trim().charAt(0).toUpperCase()}</div>
             <div>
               <h2>{parentName}</h2>
               <p>{parentEmail}</p>
@@ -434,25 +438,25 @@ export default function NavShell({ onSignOut }: NavShellProps) {
         <>
           <section className="profile-card">
             <div className="profile-row">
-              <div className="avatar-circle">M</div>
+              <div className="avatar-circle">{childInitial}</div>
               <div>
                 <p className="profile-label">Perfil del hijo/a</p>
-                <h2>{childName}, 8 años</h2>
-                <p className="profile-condition">Condición detectada: TDAH</p>
+                <h2>{childName}{childAge ? `, ${childAge} años` : ''}</h2>
+                <p className="profile-condition">{childProfile ? `Perfil detectado: ${childProfile}` : 'Perfil en evaluación'}</p>
               </div>
             </div>
             <div className="profile-stats">
               <div>
                 <span>Edad</span>
-                <strong>8</strong>
+                <strong>{childAge ?? '-'}</strong>
               </div>
               <div>
-                <span>Condición</span>
-                <strong>TDAH</strong>
+                <span>Perfil</span>
+                <strong>{childProfile || 'No disponible'}</strong>
               </div>
               <div>
                 <span>Objetivo</span>
-                <strong>Mejorar foco</strong>
+                <strong>{dashboardObjective}</strong>
               </div>
             </div>
           </section>
@@ -461,7 +465,7 @@ export default function NavShell({ onSignOut }: NavShellProps) {
             <div className="section-header">
               <div>
                 <p className="eyebrow">Actividad de hoy</p>
-                <h2>Tres sugerencias para acompañar el día</h2>
+                <h2>Sugerencias para acompañar el día</h2>
               </div>
             </div>
             <div className="activity-list">
