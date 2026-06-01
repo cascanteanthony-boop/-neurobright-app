@@ -23,10 +23,11 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
     setLoading(true);
 
     if (mode === 'register') {
-      const { error } = await supabase.auth.signUp({
+      const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: window.location.origin,
           data: {
             parentName,
             childName,
@@ -35,10 +36,19 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
         }
       });
 
+      if (signUpError) {
+        setLoading(false);
+        setErrorMessage(signUpError.message);
+        return;
+      }
+
+      // Try to sign in immediately so users can enter without confirming email
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       setLoading(false);
 
-      if (error) {
-        setErrorMessage(error.message);
+      if (signInError) {
+        // If automatic sign-in fails, proceed to the next step (questionnaire) anyway
+        onSuccess();
         return;
       }
 
@@ -59,6 +69,24 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
     }
 
     onSuccess();
+  };
+
+  const handleForgotPassword = async () => {
+    setErrorMessage('');
+    if (!email) {
+      setErrorMessage('Escribe tu email para recibir el enlace de recuperación.');
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin
+    });
+    setLoading(false);
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+    setErrorMessage('Se ha enviado un email de recuperación si la cuenta existe.');
   };
 
   return (
@@ -111,6 +139,13 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
               required
             />
           </label>
+          {mode === 'login' && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+              <button type="button" className="text-button" onClick={handleForgotPassword}>
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+          )}
           {mode === 'register' && (
             <>
               <label>
