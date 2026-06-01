@@ -1,0 +1,156 @@
+import { useState, type FormEvent } from 'react';
+import { supabase } from './lib/supabase';
+
+interface AuthSectionProps {
+  mode: 'login' | 'register';
+  onModeChange: (mode: 'login' | 'register') => void;
+  onSuccess: () => void;
+  onBack: () => void;
+}
+
+export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: AuthSectionProps) {
+  const [parentName, setParentName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [childName, setChildName] = useState('');
+  const [childAge, setChildAge] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setErrorMessage('');
+    setLoading(true);
+
+    if (mode === 'register') {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password
+      }, {
+        data: {
+          parentName,
+          childName,
+          childAge: childAge ? Number(childAge) : null
+        }
+      });
+
+      setLoading(false);
+
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+
+      onSuccess();
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    setLoading(false);
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    onSuccess();
+  };
+
+  return (
+    <main className="auth-shell">
+      <div className="auth-card">
+        <button className="link-button" onClick={onBack}>
+          ← Volver
+        </button>
+
+        <div className="auth-header">
+          <h2>{mode === 'login' ? 'Inicia sesión' : 'Crea tu cuenta'}</h2>
+          <p>
+            {mode === 'login'
+              ? 'Accede con tu email y contraseña para gestionar actividades y progreso.'
+              : 'Regístrate para crear un perfil cálido y personalizado para tu niño.'}
+          </p>
+        </div>
+
+        <form className="auth-form" onSubmit={handleSubmit}>
+          {mode === 'register' && (
+            <label>
+              Nombre del padre/madre
+              <input
+                value={parentName}
+                onChange={(event) => setParentName(event.target.value)}
+                type="text"
+                placeholder="Tu nombre"
+                required
+              />
+            </label>
+          )}
+          <label>
+            Email
+            <input
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              type="email"
+              placeholder="nombre@ejemplo.com"
+              required
+            />
+          </label>
+          <label>
+            Contraseña
+            <input
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              type="password"
+              placeholder="••••••••"
+              minLength={6}
+              required
+            />
+          </label>
+          {mode === 'register' && (
+            <>
+              <label>
+                Nombre del hijo/a
+                <input
+                  value={childName}
+                  onChange={(event) => setChildName(event.target.value)}
+                  type="text"
+                  placeholder="Nombre del niño/a"
+                  required
+                />
+              </label>
+              <label>
+                Edad del hijo/a
+                <input
+                  value={childAge}
+                  onChange={(event) => setChildAge(event.target.value)}
+                  type="number"
+                  min={1}
+                  max={18}
+                  placeholder="Edad"
+                  required
+                />
+              </label>
+            </>
+          )}
+          {errorMessage && <p className="auth-error">{errorMessage}</p>}
+          <button className="primary-button" type="submit" disabled={loading}>
+            {loading ? 'Procesando...' : mode === 'login' ? 'Entrar' : 'Registrarse'}
+          </button>
+        </form>
+
+        <div className="auth-toggle">
+          <span>
+            {mode === 'login' ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}
+          </span>
+          <button className="text-button" onClick={() => onModeChange(mode === 'login' ? 'register' : 'login')}>
+            {mode === 'login' ? 'Regístrate' : 'Inicia sesión'}
+          </button>
+        </div>
+      </div>
+    </main>
+  );
+}

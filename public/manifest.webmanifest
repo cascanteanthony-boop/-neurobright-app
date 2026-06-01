@@ -1,0 +1,21 @@
+{
+  "name": "NeuroBright",
+  "short_name": "NeuroBright",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#6C63FF",
+  "background_color": "#FFFFFF",
+  "description": "Una PWA cálida y minimalista para padres de niños con neurodiversidad.",
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
