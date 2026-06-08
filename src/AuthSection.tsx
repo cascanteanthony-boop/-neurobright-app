@@ -62,6 +62,7 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
       password
     });
 
+    clearTimeout(timeoutId);
     setLoading(false);
 
     if (error) {
@@ -69,7 +70,13 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
       return;
     }
 
-    onSuccess();
+    window.location.href = '/';
+      // Agregar timeout de 8 segundos para login
+      const timeoutId = setTimeout(() => {
+        setLoading(false);
+        setErrorMessage('Tiempo agotado, intenta de nuevo');
+      }, 8000);
+
   };
 
   const handleForgotPassword = async () => {
