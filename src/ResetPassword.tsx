@@ -8,12 +8,21 @@ export default function ResetPassword() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [recoveryDetected, setRecoveryDetected] = useState(false);
+  const [expiredToken, setExpiredToken] = useState(false);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     const detectRecoveryFromUrl = () => {
-      const params = new URL(window.location.href).searchParams;
-      if (params.get('type') === 'recovery' || params.get('access_token')) {
+      const url = new URL(window.location.href);
+      const params = url.searchParams;
+      const hashParams = new URLSearchParams(url.hash.replace(/^#/, '?'));
+
+      if (
+        params.get('type') === 'recovery' ||
+        params.get('access_token') ||
+        hashParams.get('type') === 'recovery' ||
+        hashParams.get('access_token')
+      ) {
         setRecoveryDetected(true);
       }
     };
@@ -60,7 +69,13 @@ export default function ResetPassword() {
     setLoading(false);
 
     if (updateError) {
-      setError(updateError.message);
+      const normalized = updateError.message.toLowerCase();
+      if (/(expired|otp|one-time|invalid token|invalid input)/.test(normalized)) {
+        setExpiredToken(true);
+        setError('Este link expiró. Solicita uno nuevo');
+      } else {
+        setError(updateError.message);
+      }
       return;
     }
 
@@ -106,6 +121,17 @@ export default function ResetPassword() {
 
           {error && <p className="auth-error">{error}</p>}
           {message && <p className="auth-success">{message}</p>}
+          {expiredToken && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => {
+                window.location.href = '/';
+              }}
+            >
+              Volver al login
+            </button>
+          )}
 
           <button className="primary-button" type="submit" disabled={loading || success}>
             {loading ? 'Guardando nueva contraseña...' : 'Guardar nueva contraseña'}

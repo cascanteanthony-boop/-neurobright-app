@@ -50,7 +50,12 @@ function App() {
 
     initializeSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setView('resetPassword');
+        return;
+      }
+
       if (resetPath) {
         return;
       }
