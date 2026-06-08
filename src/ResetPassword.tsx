@@ -1,69 +1,40 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { supabase } from './lib/supabase';
 
+const getResetTokens = () => {
+  const hash = window.location.hash.replace(/^#/, '?');
+  const params = new URLSearchParams(hash);
+  return {
+    accessToken: params.get('access_token'),
+    refreshToken: params.get('refresh_token'),
+    tokenHash: params.get('token_hash'),
+    type: params.get('type')
+  };
+};
+
 export default function ResetPassword() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [sessionLoading, setSessionLoading] = useState(true);
-  const [sessionReady, setSessionReady] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [recoveryDetected, setRecoveryDetected] = useState(false);
-  const [invalidLink, setInvalidLink] = useState(false);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    const initializeSession = async () => {
-      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, '?'));
-      const accessToken = hashParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token');
-      const type = hashParams.get('type');
+    const { accessToken, refreshToken, tokenHash, type } = getResetTokens();
+    console.log('ResetPassword token debug', {
+      href: window.location.href,
+      hash: window.location.hash,
+      accessToken,
+      refreshToken,
+      tokenHash,
+      type
+    });
 
-      console.log('ResetPassword token debug', {
-        href: window.location.href,
-        hash: window.location.hash,
-        accessToken,
-        refreshToken,
-        type
-      });
-
-      if (type !== 'recovery' || !accessToken || !refreshToken) {
-        setInvalidLink(true);
-        setError('Link inválido o expirado');
-        setRecoveryDetected(false);
-        setSessionLoading(false);
-        return;
-      }
-
+    if (type === 'recovery' || accessToken || tokenHash) {
       setRecoveryDetected(true);
-
-      try {
-        setSessionLoading(true);
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken
-        });
-
-        if (sessionError) {
-          console.error('ResetPassword setSession error', sessionError);
-          setInvalidLink(true);
-          setError('Link inválido o expirado');
-          setSessionReady(false);
-          return;
-        }
-
-        setSessionReady(true);
-      } catch (unexpectedError) {
-        console.error('ResetPassword setSession unexpected error', unexpectedError);
-        setInvalidLink(true);
-        setError('Link inválido o expirado');
-      } finally {
-        setSessionLoading(false);
-      }
-    };
-
-    initializeSession();
+    }
   }, []);
 
   useEffect(() => {
@@ -75,15 +46,38 @@ export default function ResetPassword() {
     }
   }, [success]);
 
+  const attemptSession = async () => {
+    const { accessToken, refreshToken, tokenHash } = getResetTokens();
+
+    if (accessToken && refreshToken) {
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      });
+      if (!sessionError) {
+        return true;
+      }
+      console.warn('ResetPassword setSession failed', sessionError);
+    }
+
+    if (tokenHash) {
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        token: tokenHash,
+        type: 'recovery'
+      });
+      if (!verifyError) {
+        return true;
+      }
+      console.warn('ResetPassword verifyOtp failed', verifyError);
+    }
+
+    return false;
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
     setMessage('');
-
-    if (!sessionReady) {
-      setError('No se pudo validar el enlace.');
-      return;
-    }
 
     if (newPassword.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres.');
@@ -97,6 +91,12 @@ export default function ResetPassword() {
 
     setLoading(true);
     try {
+      const sessionReady = await attemptSession();
+      if (!sessionReady) {
+        setError('Link expirado, solicita uno nuevo');
+        return;
+      }
+
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword
       });
@@ -104,8 +104,7 @@ export default function ResetPassword() {
       if (updateError) {
         const normalized = updateError.message.toLowerCase();
         if (/(expired|otp|one-time|invalid token|invalid input)/.test(normalized)) {
-          setInvalidLink(true);
-          setError('Este link expiró. Solicita uno nuevo');
+          setError('Link expirado, solicita uno nuevo');
         } else {
           setError(updateError.message);
         }
@@ -115,7 +114,7 @@ export default function ResetPassword() {
       setMessage('¡Contraseña actualizada! Redirigiendo al login...');
       setSuccess(true);
     } catch (unexpectedError) {
-      console.error('ResetPassword updateUser error', unexpectedError);
+      console.error('ResetPassword error', unexpectedError);
       const fallbackMessage = unexpectedError instanceof Error ? unexpectedError.message : 'Ocurrió un error inesperado.';
       setError(fallbackMessage);
     } finally {
@@ -129,68 +128,45 @@ export default function ResetPassword() {
         <div className="auth-header">
           <h2>Crea tu nueva contraseña</h2>
           <p>
-            {invalidLink
-              ? 'Link inválido o expirado. Solicita uno nuevo.'
-              : recoveryDetected
-              ? sessionLoading
-                ? 'Verificando tu enlace...'
-                : 'Ingresa una contraseña segura y confirma para completar la recuperación de tu cuenta.'
+            {recoveryDetected
+              ? 'Ingresa una contraseña segura y confirma para completar la recuperación de tu cuenta.'
               : 'Si llegaste aquí desde un enlace de recuperación de contraseña, ingresa tu nueva contraseña.'}
           </p>
         </div>
 
-        {invalidLink ? (
-          <div className="auth-form">
-            {error && <p className="auth-error">{error}</p>}
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() => {
-                window.location.href = '/';
-              }}
-            >
-              Volver al login
-            </button>
-          </div>
-        ) : (
-          <form className="auth-form" onSubmit={handleSubmit}>
-            <label>
-              Nueva contraseña
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={newPassword}
-                onChange={(event) => setNewPassword(event.target.value)}
-                minLength={6}
-                required
-                disabled={!sessionReady || sessionLoading || success}
-              />
-            </label>
-            <label>
-              Confirmar nueva contraseña
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                minLength={6}
-                required
-                disabled={!sessionReady || sessionLoading || success}
-              />
-            </label>
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <label>
+            Nueva contraseña
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              minLength={6}
+              required
+              disabled={success}
+            />
+          </label>
+          <label>
+            Confirmar nueva contraseña
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              minLength={6}
+              required
+              disabled={success}
+            />
+          </label>
 
-            {error && <p className="auth-error">{error}</p>}
-            {message && <p className="auth-success">{message}</p>}
+          {error && <p className="auth-error">{error}</p>}
+          {message && <p className="auth-success">{message}</p>}
 
-            <button
-              className="primary-button"
-              type="submit"
-              disabled={loading || !sessionReady || sessionLoading || success}
-            >
-              {loading ? 'Guardando nueva contraseña...' : 'Guardar nueva contraseña'}
-            </button>
-          </form>
-        )}
+          <button className="primary-button" type="submit" disabled={loading || success}>
+            {loading ? 'Guardando nueva contraseña...' : 'Guardar nueva contraseña'}
+          </button>
+        </form>
       </div>
     </main>
   );
