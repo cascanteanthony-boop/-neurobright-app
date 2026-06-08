@@ -16,13 +16,18 @@ export default function ResetPassword() {
       const url = new URL(window.location.href);
       const params = url.searchParams;
       const hashParams = new URLSearchParams(url.hash.replace(/^#/, '?'));
+      const accessToken = params.get('access_token') || hashParams.get('access_token');
+      const type = params.get('type') || hashParams.get('type');
 
-      if (
-        params.get('type') === 'recovery' ||
-        params.get('access_token') ||
-        hashParams.get('type') === 'recovery' ||
-        hashParams.get('access_token')
-      ) {
+      console.log('ResetPassword token debug', {
+        href: window.location.href,
+        params: Object.fromEntries(params.entries()),
+        hashParams: Object.fromEntries(hashParams.entries()),
+        accessToken,
+        type
+      });
+
+      if (type === 'recovery' || accessToken) {
         setRecoveryDetected(true);
       }
     };
@@ -42,7 +47,7 @@ export default function ResetPassword() {
     if (success) {
       const timer = window.setTimeout(() => {
         window.location.href = '/';
-      }, 1600);
+      }, 2000);
       return () => window.clearTimeout(timer);
     }
   }, [success]);
@@ -63,24 +68,31 @@ export default function ResetPassword() {
     }
 
     setLoading(true);
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: newPassword
-    });
-    setLoading(false);
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+      });
 
-    if (updateError) {
-      const normalized = updateError.message.toLowerCase();
-      if (/(expired|otp|one-time|invalid token|invalid input)/.test(normalized)) {
-        setExpiredToken(true);
-        setError('Este link expiró. Solicita uno nuevo');
-      } else {
-        setError(updateError.message);
+      if (updateError) {
+        const normalized = updateError.message.toLowerCase();
+        if (/(expired|otp|one-time|invalid token|invalid input)/.test(normalized)) {
+          setExpiredToken(true);
+          setError('Este link expiró. Solicita uno nuevo');
+        } else {
+          setError(updateError.message);
+        }
+        return;
       }
-      return;
-    }
 
-    setMessage('Tu contraseña ha sido actualizada. Redirigiendo al login...');
-    setSuccess(true);
+      setMessage('¡Contraseña actualizada! Redirigiendo al login...');
+      setSuccess(true);
+    } catch (unexpectedError) {
+      console.error('ResetPassword updateUser error', unexpectedError);
+      const fallbackMessage = unexpectedError instanceof Error ? unexpectedError.message : 'Ocurrió un error inesperado.';
+      setError(fallbackMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
