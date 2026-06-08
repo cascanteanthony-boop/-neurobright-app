@@ -95,10 +95,8 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
     }
 
     localStorage.setItem('resetEmail', email);
-    setInfoMessage('Te enviamos un código de 6 dígitos a tu email. Redirigiendo...');
-    setTimeout(() => {
-      window.location.href = '/reset-password';
-    }, 2000);
+    setInfoMessage('Te enviamos un código de verificación a tu email. Redirigiendo...');
+    window.location.href = '/reset-password';
   };
 
   return (

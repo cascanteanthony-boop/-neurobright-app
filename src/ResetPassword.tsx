@@ -31,8 +31,8 @@ export default function ResetPassword() {
       return;
     }
 
-    if (!code || code.length < 6) {
-      setError('Ingresa el código de 6 dígitos que recibiste por email.');
+    if (!code) {
+      setError('Ingresa el código de verificación que recibiste por email.');
       return;
     }
 
@@ -95,7 +95,7 @@ export default function ResetPassword() {
       <div className="auth-card">
         <div className="auth-header">
           <h2>Restablece tu contraseña</h2>
-          <p>Ingresa el código de 6 dígitos que recibiste por email y crea una nueva contraseña.</p>
+          <p>Ingresa el código de verificación que recibiste por email y crea una nueva contraseña.</p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
@@ -110,15 +110,15 @@ export default function ResetPassword() {
             />
           </label>
           <label>
-            Código de 6 dígitos
+            Código de verificación
             <input
               value={code}
               onChange={(event) => setCode(event.target.value)}
               type="text"
               inputMode="numeric"
-              pattern="[0-9]{6}"
-              placeholder="123456"
-              maxLength={6}
+              pattern="[0-9]{8}"
+              placeholder="12345678"
+              maxLength={8}
               required
             />
           </label>
