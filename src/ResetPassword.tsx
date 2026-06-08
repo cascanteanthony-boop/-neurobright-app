@@ -2,80 +2,37 @@ import { FormEvent, useEffect, useState } from 'react';
 import { supabase } from './lib/supabase';
 
 export default function ResetPassword() {
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [enabled, setEnabled] = useState(false);
-  const [waiting, setWaiting] = useState(true);
-  const [expired, setExpired] = useState(false);
-  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
+    const storedEmail = localStorage.getItem('resetEmail');
+    if (storedEmail) {
+      setEmail(storedEmail);
+    }
     console.log('ResetPassword mounted', {
       href: window.location.href,
-      hash: window.location.hash
+      storedEmail
     });
-
-    const timer = window.setTimeout(() => {
-      console.log('ResetPassword: no recovery event after 5s, marking expired');
-      setWaiting(false);
-      setExpired(true);
-      setEnabled(false);
-    }, 5000);
-
-    const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('ResetPassword auth event', { event, session });
-
-      if (event === 'PASSWORD_RECOVERY') {
-        console.log('ResetPassword: PASSWORD_RECOVERY event received');
-        setEnabled(true);
-        setWaiting(false);
-        setExpired(false);
-        clearTimeout(timer);
-        return;
-      }
-
-      if (event === 'SIGNED_IN') {
-        const hash = window.location.hash;
-        if (hash.includes('type=recovery') || hash.includes('token_hash') || hash.includes('access_token')) {
-          console.log('ResetPassword: SIGNED_IN event with recovery hash detected');
-          setEnabled(true);
-          setWaiting(false);
-          setExpired(false);
-          clearTimeout(timer);
-        }
-      }
-    });
-
-    return () => {
-      clearTimeout(timer);
-      subscription?.unsubscribe();
-    };
   }, []);
-
-  useEffect(() => {
-    if (success) {
-      const timer = window.setTimeout(() => {
-        window.location.href = '/';
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [success]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
     setMessage('');
 
-    if (expired) {
-      setError('Link expirado, solicita uno nuevo');
+    if (!email) {
+      setError('Ingresa el email usado para solicitar el código.');
       return;
     }
 
-    if (!enabled) {
-      setError('Esperando confirmación de recuperación. Por favor espera unos segundos.');
+    if (!code || code.length < 6) {
+      setError('Ingresa el código de 6 dígitos que recibiste por email.');
       return;
     }
 
@@ -91,14 +48,20 @@ export default function ResetPassword() {
 
     setLoading(true);
     try {
-      const { data: session, error: sessionError } = await supabase.auth.getSession();
-      console.log('ResetPassword current session', { session, sessionError });
+      console.log('ResetPassword verifying OTP', { email, code });
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        email,
+        token: code,
+        type: 'recovery'
+      });
 
-      if (sessionError || !session?.session) {
-        setError('No hay sesión activa de recuperación. El enlace podría haber expirado.');
+      if (verifyError) {
+        console.error('ResetPassword verifyOtp error', verifyError);
+        setError('Código inválido o expirado. Solicita uno nuevo.');
         return;
       }
 
+      console.log('ResetPassword verifyOtp success, updating password');
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword
       });
@@ -107,7 +70,7 @@ export default function ResetPassword() {
         console.error('ResetPassword updateUser error', updateError);
         const normalized = updateError.message.toLowerCase();
         if (/(expired|otp|one-time|invalid token|invalid input)/.test(normalized)) {
-          setError('Link expirado, solicita uno nuevo');
+          setError('Código inválido o expirado. Solicita uno nuevo.');
         } else {
           setError(updateError.message);
         }
@@ -115,7 +78,9 @@ export default function ResetPassword() {
       }
 
       setMessage('¡Contraseña actualizada! Redirigiendo al login...');
-      setSuccess(true);
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
     } catch (unexpectedError) {
       console.error('ResetPassword unexpected error', unexpectedError);
       const fallbackMessage = unexpectedError instanceof Error ? unexpectedError.message : 'Ocurrió un error inesperado.';
@@ -129,59 +94,63 @@ export default function ResetPassword() {
     <main className="auth-shell">
       <div className="auth-card">
         <div className="auth-header">
-          <h2>Crea tu nueva contraseña</h2>
-          <p>
-            {expired
-              ? 'Link expirado. Solicita uno nuevo.'
-              : waiting
-              ? 'Esperando confirmación de recuperación desde Supabase...'
-              : 'Ingresa una contraseña segura y confirma para recuperar tu cuenta.'}
-          </p>
+          <h2>Restablece tu contraseña</h2>
+          <p>Ingresa el código de 6 dígitos que recibiste por email y crea una nueva contraseña.</p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <label>
+            Email
+            <input
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              type="email"
+              placeholder="nombre@ejemplo.com"
+              required
+            />
+          </label>
+          <label>
+            Código de 6 dígitos
+            <input
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              placeholder="123456"
+              maxLength={6}
+              required
+            />
+          </label>
+          <label>
             Nueva contraseña
             <input
-              type="password"
-              placeholder="••••••••"
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
+              type="password"
+              placeholder="••••••••"
               minLength={6}
               required
-              disabled={success}
             />
           </label>
           <label>
             Confirmar nueva contraseña
             <input
-              type="password"
-              placeholder="••••••••"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
+              type="password"
+              placeholder="••••••••"
               minLength={6}
               required
-              disabled={success}
             />
           </label>
 
           {error && <p className="auth-error">{error}</p>}
           {message && <p className="auth-success">{message}</p>}
 
-          <button className="primary-button" type="submit" disabled={loading || success}>
-            {loading ? 'Guardando nueva contraseña...' : 'Guardar nueva contraseña'}
+          <button className="primary-button" type="submit" disabled={loading}>
+            {loading ? 'Restableciendo contraseña...' : 'Guardar nueva contraseña'}
           </button>
-          {expired && (
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => {
-                window.location.href = '/';
-              }}
-            >
-              Volver al login
-            </button>
-          )}
         </form>
       </div>
     </main>

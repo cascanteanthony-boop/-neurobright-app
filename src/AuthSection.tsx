@@ -15,11 +15,14 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
   const [childName, setChildName] = useState('');
   const [childAge, setChildAge] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage('');
+    setInfoMessage('');
     setLoading(true);
 
     if (mode === 'register') {
@@ -42,12 +45,10 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
         return;
       }
 
-      // Try to sign in immediately so users can enter without confirming email
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       setLoading(false);
 
       if (signInError) {
-        // If automatic sign-in fails, proceed to the next step (questionnaire) anyway
         onSuccess();
         return;
       }
@@ -73,20 +74,25 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
 
   const handleForgotPassword = async () => {
     setErrorMessage('');
+    setInfoMessage('');
     if (!email) {
-      setErrorMessage('Escribe tu email para recibir el enlace de recuperación.');
+      setErrorMessage('Escribe tu email para recibir el código de recuperación.');
       return;
     }
+
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: 'https://neurobright-app.vercel.app/reset-password'
     });
     setLoading(false);
+
     if (error) {
       setErrorMessage(error.message);
       return;
     }
-    setErrorMessage('Se ha enviado un email de recuperación si la cuenta existe.');
+
+    localStorage.setItem('resetEmail', email);
+    setInfoMessage('Revisa tu email, te enviamos un código de 6 dígitos');
   };
 
   return (
@@ -97,95 +103,145 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
         </button>
 
         <div className="auth-header">
-          <h2>{mode === 'login' ? 'Inicia sesión' : 'Crea tu cuenta'}</h2>
+          <h2>
+            {forgotMode
+              ? 'Olvidé mi contraseña'
+              : mode === 'login'
+              ? 'Inicia sesión'
+              : 'Crea tu cuenta'}
+          </h2>
           <p>
-            {mode === 'login'
+            {forgotMode
+              ? 'Envía el código a tu email y úsalo para crear una nueva contraseña.'
+              : mode === 'login'
               ? 'Accede con tu email y contraseña para gestionar actividades y progreso.'
               : 'Regístrate para crear un perfil cálido y personalizado para tu niño.'}
           </p>
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
-          {mode === 'register' && (
+        {forgotMode ? (
+          <form
+            className="auth-form"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              await handleForgotPassword();
+            }}
+          >
             <label>
-              Nombre del padre/madre
+              Email
               <input
-                value={parentName}
-                onChange={(event) => setParentName(event.target.value)}
-                type="text"
-                placeholder="Tu nombre"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                type="email"
+                placeholder="nombre@ejemplo.com"
                 required
               />
             </label>
-          )}
-          <label>
-            Email
-            <input
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              type="email"
-              placeholder="nombre@ejemplo.com"
-              required
-            />
-          </label>
-          <label>
-            Contraseña
-            <input
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              type="password"
-              placeholder="••••••••"
-              minLength={6}
-              required
-            />
-          </label>
-          {mode === 'login' && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-              <button type="button" className="text-button" onClick={handleForgotPassword}>
-                ¿Olvidaste tu contraseña?
-              </button>
-            </div>
-          )}
-          {mode === 'register' && (
-            <>
-              <label>
-                Nombre del hijo/a
-                <input
-                  value={childName}
-                  onChange={(event) => setChildName(event.target.value)}
-                  type="text"
-                  placeholder="Nombre del niño/a"
-                  required
-                />
-              </label>
-              <label>
-                Edad del hijo/a
-                <input
-                  value={childAge}
-                  onChange={(event) => setChildAge(event.target.value)}
-                  type="number"
-                  min={1}
-                  max={18}
-                  placeholder="Edad"
-                  required
-                />
-              </label>
-            </>
-          )}
-          {errorMessage && <p className="auth-error">{errorMessage}</p>}
-          <button className="primary-button" type="submit" disabled={loading}>
-            {loading ? 'Procesando...' : mode === 'login' ? 'Entrar' : 'Registrarse'}
-          </button>
-        </form>
 
-        <div className="auth-toggle">
-          <span>
-            {mode === 'login' ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}
-          </span>
-          <button className="text-button" onClick={() => onModeChange(mode === 'login' ? 'register' : 'login')}>
-            {mode === 'login' ? 'Regístrate' : 'Inicia sesión'}
-          </button>
-        </div>
+            {errorMessage && <p className="auth-error">{errorMessage}</p>}
+            {infoMessage && <p className="auth-success">{infoMessage}</p>}
+
+            <button className="primary-button" type="submit" disabled={loading}>
+              {loading ? 'Enviando código...' : 'Enviar código'}
+            </button>
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => {
+                setForgotMode(false);
+                setErrorMessage('');
+                setInfoMessage('');
+              }}
+            >
+              Volver al login
+            </button>
+          </form>
+        ) : (
+          <form className="auth-form" onSubmit={handleSubmit}>
+            {mode === 'register' && (
+              <label>
+                Nombre del padre/madre
+                <input
+                  value={parentName}
+                  onChange={(event) => setParentName(event.target.value)}
+                  type="text"
+                  placeholder="Tu nombre"
+                  required
+                />
+              </label>
+            )}
+            <label>
+              Email
+              <input
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                type="email"
+                placeholder="nombre@ejemplo.com"
+                required
+              />
+            </label>
+            <label>
+              Contraseña
+              <input
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                type="password"
+                placeholder="••••••••"
+                minLength={6}
+                required
+              />
+            </label>
+            {mode === 'login' && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                <button type="button" className="text-button" onClick={() => setForgotMode(true)}>
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
+            )}
+            {mode === 'register' && (
+              <>
+                <label>
+                  Nombre del hijo/a
+                  <input
+                    value={childName}
+                    onChange={(event) => setChildName(event.target.value)}
+                    type="text"
+                    placeholder="Nombre del niño/a"
+                    required
+                  />
+                </label>
+                <label>
+                  Edad del hijo/a
+                  <input
+                    value={childAge}
+                    onChange={(event) => setChildAge(event.target.value)}
+                    type="number"
+                    min={1}
+                    max={18}
+                    placeholder="Edad"
+                    required
+                  />
+                </label>
+              </>
+            )}
+            {errorMessage && <p className="auth-error">{errorMessage}</p>}
+            {infoMessage && <p className="auth-success">{infoMessage}</p>}
+            <button className="primary-button" type="submit" disabled={loading}>
+              {loading ? 'Procesando...' : mode === 'login' ? 'Entrar' : 'Registrarse'}
+            </button>
+          </form>
+        )}
+
+        {!forgotMode && (
+          <div className="auth-toggle">
+            <span>
+              {mode === 'login' ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}
+            </span>
+            <button className="text-button" onClick={() => onModeChange(mode === 'login' ? 'register' : 'login')}>
+              {mode === 'login' ? 'Regístrate' : 'Inicia sesión'}
+            </button>
+          </div>
+        )}
       </div>
     </main>
   );
