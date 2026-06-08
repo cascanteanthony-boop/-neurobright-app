@@ -52,7 +52,7 @@ export default function ResetPassword() {
       const { error: verifyError } = await supabase.auth.verifyOtp({
         email,
         token: code,
-        type: 'recovery'
+        type: 'email'
       });
 
       if (verifyError) {

@@ -81,8 +81,11 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://neurobright-app.vercel.app/reset-password'
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: false
+      }
     });
     setLoading(false);
 
@@ -92,7 +95,7 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
     }
 
     localStorage.setItem('resetEmail', email);
-    setInfoMessage('Revisa tu email, te enviamos un código de 6 dígitos');
+    setInfoMessage('Te enviamos un código de 6 dígitos a tu email.');
   };
 
   return (
