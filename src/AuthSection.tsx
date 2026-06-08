@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useRef, useEffect, type FormEvent } from 'react';
 import { supabase } from './lib/supabase';
 
 interface AuthSectionProps {
@@ -18,6 +18,8 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
   const [infoMessage, setInfoMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
+  const overallTimeoutRef = useRef<number | null>(null);
+  const postResponseTimeoutRef = useRef<number | null>(null);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -25,59 +27,95 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
     setInfoMessage('');
     setLoading(true);
 
-    if (mode === 'register') {
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: window.location.origin,
-          data: {
-            parentName,
-            childName,
-            childAge: childAge ? Number(childAge) : null
-          }
-        }
-      });
+    console.log('Iniciando login...');
 
-      if (signUpError) {
-        setLoading(false);
-        setErrorMessage(signUpError.message);
-        return;
-      }
-
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    // Timeout global de 8s que cancela loading y muestra error
+    overallTimeoutRef.current = window.setTimeout(() => {
+      console.error('Login: timeout de 8 segundos');
       setLoading(false);
+      setErrorMessage('Tiempo agotado, intenta de nuevo');
+    }, 8000);
 
-      if (signInError) {
-        onSuccess();
+    try {
+      if (mode === 'register') {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: window.location.origin,
+            data: {
+              parentName,
+              childName,
+              childAge: childAge ? Number(childAge) : null
+            }
+          }
+        });
+
+        console.log('Respuesta de Supabase recibida (signUp)', signUpError ?? null);
+
+        if (signUpError) {
+          clearTimeout(overallTimeoutRef.current ?? undefined);
+          console.error(signUpError);
+          setLoading(false);
+          setErrorMessage(signUpError.message);
+          return;
+        }
+
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        console.log('Respuesta de Supabase recibida (signIn)', data ?? signInError ?? null);
+
+        clearTimeout(overallTimeoutRef.current ?? undefined);
+
+        if (signInError) {
+          console.error(signInError);
+          setErrorMessage(signInError.message);
+          postResponseTimeoutRef.current = window.setTimeout(() => setLoading(false), 3000);
+          return;
+        }
+
+        if (data && (data as any).user) {
+          console.log('Usuario autenticado', (data as any).user);
+          window.location.href = '/';
+          return;
+        }
+
+        postResponseTimeoutRef.current = window.setTimeout(() => setLoading(false), 3000);
         return;
       }
 
-      onSuccess();
-      return;
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      console.log('Respuesta de Supabase recibida', data ?? error ?? null);
+
+      clearTimeout(overallTimeoutRef.current ?? undefined);
+
+      if (error) {
+        console.error(error);
+        setErrorMessage(error.message);
+        postResponseTimeoutRef.current = window.setTimeout(() => setLoading(false), 3000);
+        return;
+      }
+
+      if (data && (data as any).user) {
+        console.log('Usuario autenticado', (data as any).user);
+        window.location.href = '/';
+        return;
+      }
+
+      postResponseTimeoutRef.current = window.setTimeout(() => setLoading(false), 3000);
+    } catch (err) {
+      console.error('Error inesperado en login', err);
+      clearTimeout(overallTimeoutRef.current ?? undefined);
+      setErrorMessage('Ocurrió un error inesperado');
+      postResponseTimeoutRef.current = window.setTimeout(() => setLoading(false), 3000);
     }
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    clearTimeout(timeoutId);
-    setLoading(false);
-
-    if (error) {
-      setErrorMessage(error.message);
-      return;
-    }
-
-    window.location.href = '/';
-      // Agregar timeout de 8 segundos para login
-      const timeoutId = setTimeout(() => {
-        setLoading(false);
-        setErrorMessage('Tiempo agotado, intenta de nuevo');
-      }, 8000);
-
   };
+
+  useEffect(() => {
+    return () => {
+      if (overallTimeoutRef.current) clearTimeout(overallTimeoutRef.current);
+      if (postResponseTimeoutRef.current) clearTimeout(postResponseTimeoutRef.current);
+    };
+  }, []);
 
   const handleForgotPassword = async () => {
     setErrorMessage('');
