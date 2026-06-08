@@ -1530,6 +1530,15 @@ button {
   font-size: 0.95rem;
 }
 
+.auth-success {
+  color: #155724;
+  background: #d4f9e0;
+  border: 1px solid #a3e4c7;
+  border-radius: 16px;
+  padding: 12px 14px;
+  font-size: 0.95rem;
+}
+
 .auth-toggle {
   display: flex;
   justify-content: space-between;

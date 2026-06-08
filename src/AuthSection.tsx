@@ -79,7 +79,7 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
     }
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin
+      redirectTo: 'https://neurobright-app.vercel.app/reset-password'
     });
     setLoading(false);
     if (error) {

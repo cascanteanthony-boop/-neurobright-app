@@ -5,12 +5,14 @@ import WelcomeScreen from './WelcomeScreen';
 import AuthSection from './AuthSection';
 import NavShell from './NavShell';
 import Questionnaire from './Questionnaire';
+import ResetPassword from './ResetPassword';
 import type { UserMetadata } from './types';
 
-export type AppView = 'welcome' | 'auth' | 'questionnaire' | 'home';
+export type AppView = 'welcome' | 'auth' | 'questionnaire' | 'home' | 'resetPassword';
 
 function App() {
-  const [view, setView] = useState<AppView>('welcome');
+  const resetPath = window.location.pathname === '/reset-password';
+  const [view, setView] = useState<AppView>(resetPath ? 'resetPassword' : 'welcome');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [user, setUser] = useState<User | null>(null);
   const [userMetadata, setUserMetadata] = useState<UserMetadata>({});
@@ -34,6 +36,10 @@ function App() {
 
   useEffect(() => {
     const initializeSession = async () => {
+      if (resetPath) {
+        return;
+      }
+
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         const user = await refreshUser();
@@ -45,6 +51,10 @@ function App() {
     initializeSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (resetPath) {
+        return;
+      }
+
       if (session) {
         const user = await refreshUser();
         const metadata = (user?.user_metadata ?? {}) as UserMetadata;
@@ -117,6 +127,7 @@ function App() {
         <Questionnaire userMetadata={userMetadata} onComplete={handleQuestionnaireComplete} />
       )}
 
+      {view === 'resetPassword' && <ResetPassword />}
       {view === 'home' && <NavShell userMetadata={userMetadata} onSignOut={handleSignOut} />}
     </div>
   );
