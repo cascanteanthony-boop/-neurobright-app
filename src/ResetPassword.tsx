@@ -5,42 +5,65 @@ export default function ResetPassword() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [sessionReady, setSessionReady] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [recoveryDetected, setRecoveryDetected] = useState(false);
-  const [expiredToken, setExpiredToken] = useState(false);
+  const [invalidLink, setInvalidLink] = useState(false);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    const detectRecoveryFromUrl = () => {
-      const url = new URL(window.location.href);
-      const params = url.searchParams;
-      const hashParams = new URLSearchParams(url.hash.replace(/^#/, '?'));
-      const accessToken = params.get('access_token') || hashParams.get('access_token');
-      const type = params.get('type') || hashParams.get('type');
+    const initializeSession = async () => {
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, '?'));
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      const type = hashParams.get('type');
 
       console.log('ResetPassword token debug', {
         href: window.location.href,
-        params: Object.fromEntries(params.entries()),
-        hashParams: Object.fromEntries(hashParams.entries()),
+        hash: window.location.hash,
         accessToken,
+        refreshToken,
         type
       });
 
-      if (type === 'recovery' || accessToken) {
-        setRecoveryDetected(true);
+      if (type !== 'recovery' || !accessToken || !refreshToken) {
+        setInvalidLink(true);
+        setError('Link inválido o expirado');
+        setRecoveryDetected(false);
+        setSessionLoading(false);
+        return;
+      }
+
+      setRecoveryDetected(true);
+
+      try {
+        setSessionLoading(true);
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken
+        });
+
+        if (sessionError) {
+          console.error('ResetPassword setSession error', sessionError);
+          setInvalidLink(true);
+          setError('Link inválido o expirado');
+          setSessionReady(false);
+          return;
+        }
+
+        setSessionReady(true);
+      } catch (unexpectedError) {
+        console.error('ResetPassword setSession unexpected error', unexpectedError);
+        setInvalidLink(true);
+        setError('Link inválido o expirado');
+      } finally {
+        setSessionLoading(false);
       }
     };
 
-    detectRecoveryFromUrl();
-
-    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setRecoveryDetected(true);
-      }
-    });
-
-    return () => subscription?.unsubscribe();
+    initializeSession();
   }, []);
 
   useEffect(() => {
@@ -52,10 +75,15 @@ export default function ResetPassword() {
     }
   }, [success]);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
     setMessage('');
+
+    if (!sessionReady) {
+      setError('No se pudo validar el enlace.');
+      return;
+    }
 
     if (newPassword.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres.');
@@ -76,7 +104,7 @@ export default function ResetPassword() {
       if (updateError) {
         const normalized = updateError.message.toLowerCase();
         if (/(expired|otp|one-time|invalid token|invalid input)/.test(normalized)) {
-          setExpiredToken(true);
+          setInvalidLink(true);
           setError('Este link expiró. Solicita uno nuevo');
         } else {
           setError(updateError.message);
@@ -101,54 +129,68 @@ export default function ResetPassword() {
         <div className="auth-header">
           <h2>Crea tu nueva contraseña</h2>
           <p>
-            {recoveryDetected
-              ? 'Ingresa una contraseña segura y confirma para completar la recuperación de tu cuenta.'
+            {invalidLink
+              ? 'Link inválido o expirado. Solicita uno nuevo.'
+              : recoveryDetected
+              ? sessionLoading
+                ? 'Verificando tu enlace...'
+                : 'Ingresa una contraseña segura y confirma para completar la recuperación de tu cuenta.'
               : 'Si llegaste aquí desde un enlace de recuperación de contraseña, ingresa tu nueva contraseña.'}
           </p>
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <label>
-            Nueva contraseña
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-              minLength={6}
-              required
-            />
-          </label>
-          <label>
-            Confirmar nueva contraseña
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              minLength={6}
-              required
-            />
-          </label>
-
-          {error && <p className="auth-error">{error}</p>}
-          {message && <p className="auth-success">{message}</p>}
-          {expiredToken && (
+        {invalidLink ? (
+          <div className="auth-form">
+            {error && <p className="auth-error">{error}</p>}
             <button
               type="button"
-              className="secondary-button"
+              className="primary-button"
               onClick={() => {
                 window.location.href = '/';
               }}
             >
               Volver al login
             </button>
-          )}
+          </div>
+        ) : (
+          <form className="auth-form" onSubmit={handleSubmit}>
+            <label>
+              Nueva contraseña
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                minLength={6}
+                required
+                disabled={!sessionReady || sessionLoading || success}
+              />
+            </label>
+            <label>
+              Confirmar nueva contraseña
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                minLength={6}
+                required
+                disabled={!sessionReady || sessionLoading || success}
+              />
+            </label>
 
-          <button className="primary-button" type="submit" disabled={loading || success}>
-            {loading ? 'Guardando nueva contraseña...' : 'Guardar nueva contraseña'}
-          </button>
-        </form>
+            {error && <p className="auth-error">{error}</p>}
+            {message && <p className="auth-success">{message}</p>}
+
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={loading || !sessionReady || sessionLoading || success}
+            >
+              {loading ? 'Guardando nueva contraseña...' : 'Guardar nueva contraseña'}
+            </button>
+          </form>
+        )}
       </div>
     </main>
   );
