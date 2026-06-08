@@ -1,40 +1,58 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { supabase } from './lib/supabase';
 
-const getResetTokens = () => {
-  const hash = window.location.hash.replace(/^#/, '?');
-  const params = new URLSearchParams(hash);
-  return {
-    accessToken: params.get('access_token'),
-    refreshToken: params.get('refresh_token'),
-    tokenHash: params.get('token_hash'),
-    type: params.get('type')
-  };
-};
-
 export default function ResetPassword() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [recoveryDetected, setRecoveryDetected] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+  const [waiting, setWaiting] = useState(true);
+  const [expired, setExpired] = useState(false);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    const { accessToken, refreshToken, tokenHash, type } = getResetTokens();
-    console.log('ResetPassword token debug', {
+    console.log('ResetPassword mounted', {
       href: window.location.href,
-      hash: window.location.hash,
-      accessToken,
-      refreshToken,
-      tokenHash,
-      type
+      hash: window.location.hash
     });
 
-    if (type === 'recovery' || accessToken || tokenHash) {
-      setRecoveryDetected(true);
-    }
+    const timer = window.setTimeout(() => {
+      console.log('ResetPassword: no recovery event after 5s, marking expired');
+      setWaiting(false);
+      setExpired(true);
+      setEnabled(false);
+    }, 5000);
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('ResetPassword auth event', { event, session });
+
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log('ResetPassword: PASSWORD_RECOVERY event received');
+        setEnabled(true);
+        setWaiting(false);
+        setExpired(false);
+        clearTimeout(timer);
+        return;
+      }
+
+      if (event === 'SIGNED_IN') {
+        const hash = window.location.hash;
+        if (hash.includes('type=recovery') || hash.includes('token_hash') || hash.includes('access_token')) {
+          console.log('ResetPassword: SIGNED_IN event with recovery hash detected');
+          setEnabled(true);
+          setWaiting(false);
+          setExpired(false);
+          clearTimeout(timer);
+        }
+      }
+    });
+
+    return () => {
+      clearTimeout(timer);
+      subscription?.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -42,42 +60,24 @@ export default function ResetPassword() {
       const timer = window.setTimeout(() => {
         window.location.href = '/';
       }, 2000);
-      return () => window.clearTimeout(timer);
+      return () => clearTimeout(timer);
     }
   }, [success]);
-
-  const attemptSession = async () => {
-    const { accessToken, refreshToken, tokenHash } = getResetTokens();
-
-    if (accessToken && refreshToken) {
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken
-      });
-      if (!sessionError) {
-        return true;
-      }
-      console.warn('ResetPassword setSession failed', sessionError);
-    }
-
-    if (tokenHash) {
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        token: tokenHash,
-        type: 'recovery'
-      });
-      if (!verifyError) {
-        return true;
-      }
-      console.warn('ResetPassword verifyOtp failed', verifyError);
-    }
-
-    return false;
-  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
     setMessage('');
+
+    if (expired) {
+      setError('Link expirado, solicita uno nuevo');
+      return;
+    }
+
+    if (!enabled) {
+      setError('Esperando confirmación de recuperación. Por favor espera unos segundos.');
+      return;
+    }
 
     if (newPassword.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres.');
@@ -91,9 +91,11 @@ export default function ResetPassword() {
 
     setLoading(true);
     try {
-      const sessionReady = await attemptSession();
-      if (!sessionReady) {
-        setError('Link expirado, solicita uno nuevo');
+      const { data: session, error: sessionError } = await supabase.auth.getSession();
+      console.log('ResetPassword current session', { session, sessionError });
+
+      if (sessionError || !session?.session) {
+        setError('No hay sesión activa de recuperación. El enlace podría haber expirado.');
         return;
       }
 
@@ -102,6 +104,7 @@ export default function ResetPassword() {
       });
 
       if (updateError) {
+        console.error('ResetPassword updateUser error', updateError);
         const normalized = updateError.message.toLowerCase();
         if (/(expired|otp|one-time|invalid token|invalid input)/.test(normalized)) {
           setError('Link expirado, solicita uno nuevo');
@@ -114,7 +117,7 @@ export default function ResetPassword() {
       setMessage('¡Contraseña actualizada! Redirigiendo al login...');
       setSuccess(true);
     } catch (unexpectedError) {
-      console.error('ResetPassword error', unexpectedError);
+      console.error('ResetPassword unexpected error', unexpectedError);
       const fallbackMessage = unexpectedError instanceof Error ? unexpectedError.message : 'Ocurrió un error inesperado.';
       setError(fallbackMessage);
     } finally {
@@ -128,9 +131,11 @@ export default function ResetPassword() {
         <div className="auth-header">
           <h2>Crea tu nueva contraseña</h2>
           <p>
-            {recoveryDetected
-              ? 'Ingresa una contraseña segura y confirma para completar la recuperación de tu cuenta.'
-              : 'Si llegaste aquí desde un enlace de recuperación de contraseña, ingresa tu nueva contraseña.'}
+            {expired
+              ? 'Link expirado. Solicita uno nuevo.'
+              : waiting
+              ? 'Esperando confirmación de recuperación desde Supabase...'
+              : 'Ingresa una contraseña segura y confirma para recuperar tu cuenta.'}
           </p>
         </div>
 
@@ -166,6 +171,17 @@ export default function ResetPassword() {
           <button className="primary-button" type="submit" disabled={loading || success}>
             {loading ? 'Guardando nueva contraseña...' : 'Guardar nueva contraseña'}
           </button>
+          {expired && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => {
+                window.location.href = '/';
+              }}
+            >
+              Volver al login
+            </button>
+          )}
         </form>
       </div>
     </main>
