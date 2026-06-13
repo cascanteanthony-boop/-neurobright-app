@@ -9,7 +9,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    // Desactiva el bloqueo interno que cuelga el login (200 OK pero la promesa no resuelve)
+    // La sesión se guarda solo mientras el navegador está abierto.
+    // Al cerrarlo, se cierra la sesión y pedirá login otra vez.
+    storage: window.sessionStorage,
+    persistSession: true,
+    autoRefreshToken: true,
     lock: async (_name, _acquireTimeout, fn) => {
       return await fn();
     },
