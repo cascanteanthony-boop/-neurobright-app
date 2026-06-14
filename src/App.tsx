@@ -75,6 +75,40 @@ function App() {
     return () => subscription?.unsubscribe();
   }, []);
 
+  // ───────────────────────────────────────────────────────────
+  // NUEVO: Cierre automático de sesión por inactividad
+  // Cambiá el número de minutos en INACTIVITY_MINUTES.
+  // Para PROBAR rápido, poné 0.5 (= 30 segundos). Para uso real, 10.
+  // ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    // Solo vigilamos cuando hay sesión iniciada
+    if (!user) return;
+
+    const INACTIVITY_MINUTES = 10;
+    const INACTIVITY_LIMIT = INACTIVITY_MINUTES * 60 * 1000;
+    let timeoutId: number;
+
+    const cerrarPorInactividad = async () => {
+      await supabase.auth.signOut();
+    };
+
+    const reiniciarTemporizador = () => {
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(cerrarPorInactividad, INACTIVITY_LIMIT);
+    };
+
+    const eventos = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    eventos.forEach((evento) => window.addEventListener(evento, reiniciarTemporizador));
+
+    reiniciarTemporizador(); // arrancar el conteo
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      eventos.forEach((evento) => window.removeEventListener(evento, reiniciarTemporizador));
+    };
+  }, [user]);
+  // ───────────────────────────────────────────────────────────
+
   const handleAuthSuccess = async () => {
     const user = await refreshUser();
     if (!user) {

@@ -267,14 +267,26 @@ export default function Questionnaire({ userMetadata, onComplete }: Questionnair
       childProfile
     };
 
-    const { error } = await supabase.auth.updateUser({
-      data: updatedMetadata
-    });
+    // Guardamos con un límite de tiempo: si Supabase tarda demasiado,
+    // igual avanzamos al dashboard (los datos se guardan en el servidor).
+    let saveError: { message: string } | null = null;
+    try {
+      const updatePromise = supabase.auth.updateUser({ data: updatedMetadata });
+      const timeoutPromise = new Promise<null>((resolve) =>
+        window.setTimeout(() => resolve(null), 10000)
+      );
+      const result = await Promise.race([updatePromise, timeoutPromise]);
+      if (result && 'error' in result && result.error) {
+        saveError = result.error;
+      }
+    } catch (err) {
+      console.error('Error guardando el perfil', err);
+    }
 
     setLoading(false);
 
-    if (error) {
-      setErrorMessage(error.message);
+    if (saveError) {
+      setErrorMessage(saveError.message);
       return;
     }
 

@@ -34,7 +34,7 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
       console.error('Login: timeout de 8 segundos');
       setLoading(false);
       setErrorMessage('Tiempo agotado, intenta de nuevo');
-    }, 8000);
+    }, 25000);
 
     try {
       if (mode === 'register') {
