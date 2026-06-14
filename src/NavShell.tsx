@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ActivityScreen, { type ActivityInfo } from './ActivityScreen';
 import type { UserMetadata } from './types';
 
 type Tab = 'inicio' | 'perfil' | 'actividades' | 'progreso' | 'cuenta';
@@ -97,6 +98,7 @@ const tabLabels: Record<Tab, string> = {
 
 export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
   const [activeTab, setActiveTab] = useState<Tab>('inicio');
+  const [activeActivity, setActiveActivity] = useState<ActivityInfo | null>(null);
   const [activityFilter, setActivityFilter] = useState<Category>('Todas');
   const childName = userMetadata.childName ?? 'tu hijo/a';
   const parentName = userMetadata.parentName ?? 'Cuenta familiar';
@@ -203,7 +205,7 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
                     </span>
                   </div>
                 </div>
-                <button className="start-button">Iniciar</button>
+                <button className="start-button" onClick={() => setActiveActivity(activity)}>Iniciar</button>
               </article>
             ))}
           </div>
@@ -510,10 +512,17 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
         </>
       )}
 
+      {activeActivity && (
+        <ActivityScreen
+          activity={activeActivity}
+          onClose={() => setActiveActivity(null)}
+          onComplete={(a) => console.log('Actividad completada:', a.title)}
+        />
+      )}
+
       <button className="fab-button" aria-label="Agregar registro del día">
         +
       </button>
-
       <nav className="bottom-nav" aria-label="Barra de navegación">
         {Object.entries(tabLabels).map(([tab, label]) => (
           <button
