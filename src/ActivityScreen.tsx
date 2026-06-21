@@ -95,7 +95,31 @@ function BreathingExercise({ activity, onClose, onComplete }: BodyProps) {
   );
 }
 
-// ── Juego de memoria (parejas) ────────────────────────────────
+// ── Juego de memoria (parejas) let audioCtx: AudioContext | null = null;
+function playSound(type: 'flip' | 'match' | 'win') {
+  try {
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!audioCtx) audioCtx = new Ctx();
+    const ctx = audioCtx;
+    const now = ctx.currentTime;
+    const notes = type === 'flip' ? [523] : type === 'match' ? [659, 784] : [523, 659, 784, 1047];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const start = now + i * 0.12;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.2, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.25);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.3);
+    });
+  } catch {
+    // si el navegador bloquea el audio, lo ignoramos
+  }
+}────────────────────────────────
 const MEMORY_EMOJIS = ['🐶', '🐱', '🦊', '🐰', '🐸', '🐵'];
 
 interface Card { id: number; emoji: string; matched: boolean; }
@@ -123,10 +147,11 @@ function MemoryGame({ activity, onClose, onComplete }: BodyProps) {
   const matchedCount = cards.filter((c) => c.matched).length;
   const won = matchedCount === cards.length;
 
-  const handleFlip = (index: number) => {
+ const handleFlip = (index: number) => {
     if (lock || won) return;
     if (cards[index].matched || flipped.includes(index) || flipped.length === 2) return;
 
+    playSound('flip');
     const next = [...flipped, index];
     setFlipped(next);
 
@@ -135,9 +160,11 @@ function MemoryGame({ activity, onClose, onComplete }: BodyProps) {
       setLock(true);
       const [a, b] = next;
       if (cards[a].emoji === cards[b].emoji) {
+        const willWin = cards.filter((c) => c.matched).length + 2 === cards.length;
         setTimeout(() => {
           setCards((prev) => prev.map((c, i) => (i === a || i === b ? { ...c, matched: true } : c)));
           setFlipped([]); setLock(false);
+          playSound(willWin ? 'win' : 'match');
         }, 600);
       } else {
         setTimeout(() => { setFlipped([]); setLock(false); }, 900);
