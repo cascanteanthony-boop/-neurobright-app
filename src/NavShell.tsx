@@ -490,13 +490,13 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
                 <h2>Avance actual</h2>
               </div>
             </div>
-            <div className="progress-card">
+           <div className="progress-card">
               <div className="progress-label-row">
-                <span>60% cumplido</span>
-                <strong>4/7 objetivos</strong>
+                <span>0% cumplido</span>
+                <strong>0/7 objetivos</strong>
               </div>
               <div className="progress-bar">
-                <span className="progress-fill" />
+                <span className="progress-fill" style={{ width: '0%' }} />
               </div>
               <div className="progress-days">
                 <span>L</span>
