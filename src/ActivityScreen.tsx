@@ -15,8 +15,8 @@ interface BodyProps {
   onComplete: (activity: ActivityInfo) => void;
 }
 
-const TOTAL_CYCLES = 4;        // ← cambiá este número para más/menos respiraciones
-const CYCLE_SECONDS = 19;      // 4 inhala + 7 sostén + 8 exhala
+const TOTAL_CYCLES = 4;
+const CYCLE_SECONDS = 19; // 4 inhala + 7 sostén + 8 exhala
 
 const primaryBtn = (color: string): CSSProperties => ({
   width: '100%', padding: 14, borderRadius: 14, border: 'none',
@@ -30,9 +30,10 @@ const completeBtn: CSSProperties = {
 };
 const backBtn: CSSProperties = {
   width: '100%', padding: 12, borderRadius: 14, border: '1px solid #dddddd',
-  background: '#fff', color: '#6b6b85', fontSize: 15, cursor: 'pointer'
+  background: '#fff', color: '#6b6b85', fontSize: 15, cursor: 'pointer', marginBottom: 10
 };
 
+// ── Respiración 4-7-8 ─────────────────────────────────────────
 function BreathingExercise({ activity, onClose, onComplete }: BodyProps) {
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -58,14 +59,9 @@ function BreathingExercise({ activity, onClose, onComplete }: BodyProps) {
   }, [running]);
 
   const started = running || elapsed > 0;
-  let phaseLabel = 'Prepárate';
-  let phaseCount = 0;
-  let scale = 0.9;
-  let transitionSeconds = 0.5;
-
-  if (finished) {
-    phaseLabel = '¡Bien hecho!'; scale = 1;
-  } else if (started) {
+  let phaseLabel = 'Prepárate', phaseCount = 0, scale = 0.9, transitionSeconds = 0.5;
+  if (finished) { phaseLabel = '¡Bien hecho!'; scale = 1; }
+  else if (started) {
     if (elapsed < 4) { phaseLabel = 'Inhala'; phaseCount = 4 - elapsed; scale = 1.5; transitionSeconds = 4; }
     else if (elapsed < 11) { phaseLabel = 'Sostén'; phaseCount = 11 - elapsed; scale = 1.5; transitionSeconds = 0.5; }
     else { phaseLabel = 'Exhala'; phaseCount = 19 - elapsed; scale = 0.6; transitionSeconds = 8; }
@@ -81,8 +77,7 @@ function BreathingExercise({ activity, onClose, onComplete }: BodyProps) {
         <div style={{
           width: 120, height: 120, borderRadius: '50%',
           background: `radial-gradient(circle at 35% 30%, ${activity.color}, ${activity.color}bb)`,
-          transform: `scale(${scale})`,
-          transition: `transform ${transitionSeconds}s ease-in-out`,
+          transform: `scale(${scale})`, transition: `transform ${transitionSeconds}s ease-in-out`,
           boxShadow: `0 10px 30px ${activity.color}55`
         }} />
       </div>
@@ -100,6 +95,101 @@ function BreathingExercise({ activity, onClose, onComplete }: BodyProps) {
   );
 }
 
+// ── Juego de memoria (parejas) ────────────────────────────────
+const MEMORY_EMOJIS = ['🐶', '🐱', '🦊', '🐰', '🐸', '🐵'];
+
+interface Card { id: number; emoji: string; matched: boolean; }
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildDeck(): Card[] {
+  const pairs = [...MEMORY_EMOJIS, ...MEMORY_EMOJIS];
+  return shuffle(pairs).map((emoji, index) => ({ id: index, emoji, matched: false }));
+}
+
+function MemoryGame({ activity, onClose, onComplete }: BodyProps) {
+  const [cards, setCards] = useState<Card[]>(buildDeck);
+  const [flipped, setFlipped] = useState<number[]>([]);
+  const [moves, setMoves] = useState(0);
+  const [lock, setLock] = useState(false);
+
+  const matchedCount = cards.filter((c) => c.matched).length;
+  const won = matchedCount === cards.length;
+
+  const handleFlip = (index: number) => {
+    if (lock || won) return;
+    if (cards[index].matched || flipped.includes(index) || flipped.length === 2) return;
+
+    const next = [...flipped, index];
+    setFlipped(next);
+
+    if (next.length === 2) {
+      setMoves((m) => m + 1);
+      setLock(true);
+      const [a, b] = next;
+      if (cards[a].emoji === cards[b].emoji) {
+        setTimeout(() => {
+          setCards((prev) => prev.map((c, i) => (i === a || i === b ? { ...c, matched: true } : c)));
+          setFlipped([]); setLock(false);
+        }, 600);
+      } else {
+        setTimeout(() => { setFlipped([]); setLock(false); }, 900);
+      }
+    }
+  };
+
+  const restart = () => { setCards(buildDeck()); setFlipped([]); setMoves(0); setLock(false); };
+
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b6b85', fontSize: 14, marginBottom: 12 }}>
+        <span>Parejas: {matchedCount / 2} / {cards.length / 2}</span>
+        <span>Intentos: {moves}</span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
+        {cards.map((card, index) => {
+          const faceUp = card.matched || flipped.includes(index);
+          return (
+            <button
+              key={card.id}
+              onClick={() => handleFlip(index)}
+              style={{
+                aspectRatio: '1 / 1', minHeight: 60, borderRadius: 12, border: 'none',
+                cursor: faceUp ? 'default' : 'pointer', fontSize: 26,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: card.matched ? `${activity.color}22` : faceUp ? '#fff' : activity.color,
+                boxShadow: faceUp ? `inset 0 0 0 2px ${activity.color}55` : '0 4px 10px rgba(0,0,0,0.12)',
+                transition: 'background 0.2s'
+              }}
+            >
+              {faceUp ? card.emoji : ''}
+            </button>
+          );
+        })}
+      </div>
+
+      {won && (
+        <p style={{ textAlign: 'center', color: '#2e9e5b', fontWeight: 700, marginBottom: 12 }}>
+          ¡Ganaste! 🎉 Lo lograste en {moves} intentos
+        </p>
+      )}
+
+      <button onClick={restart} style={backBtn}>Reiniciar</button>
+      <button onClick={() => { onComplete(activity); onClose(); }} style={completeBtn}>Completar actividad</button>
+      <button onClick={onClose} style={backBtn}>Volver</button>
+    </>
+  );
+}
+
+// ── Temporizador genérico (resto de actividades) ──────────────
 function TimerExercise({ activity, onClose, onComplete }: BodyProps) {
   const totalSeconds = activity.duration * 60;
   const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
@@ -143,6 +233,7 @@ function TimerExercise({ activity, onClose, onComplete }: BodyProps) {
 
 export default function ActivityScreen({ activity, onClose, onComplete }: BodyProps) {
   const isBreathing = activity.title.includes('Respiración');
+  const isMemory = activity.title.toLowerCase().includes('memoria');
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(25, 25, 50, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
@@ -155,6 +246,8 @@ export default function ActivityScreen({ activity, onClose, onComplete }: BodyPr
         </div>
         {isBreathing
           ? <BreathingExercise activity={activity} onClose={onClose} onComplete={onComplete} />
+          : isMemory
+          ? <MemoryGame activity={activity} onClose={onClose} onComplete={onComplete} />
           : <TimerExercise activity={activity} onClose={onClose} onComplete={onComplete} />}
       </div>
     </div>
