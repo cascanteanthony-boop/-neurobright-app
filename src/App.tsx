@@ -131,11 +131,20 @@ function App() {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      // scope 'local' cierra la sesión en este dispositivo sin esperar al servidor
+      // (evita que se cuelgue si Supabase está lento o en cold start)
+      await Promise.race([
+        supabase.auth.signOut({ scope: 'local' }),
+        new Promise((resolve) => setTimeout(resolve, 3000))
+      ]);
+    } catch (err) {
+      console.error('Error al cerrar sesión', err);
+    }
     setUser(null);
     setUserMetadata({});
     setAuthMode('login');
-    setView('auth');
+    setView('welcome');
   };
 
   return (

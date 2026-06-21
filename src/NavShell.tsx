@@ -77,7 +77,7 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
   const today = new Date();
   const formattedDate = today.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
-  const profileAnswers = userMetadata.questionnaireAnswers ?? {};
+  const profileAnswers = (userMetadata.questionnaireAnswers ?? {}) as Record<string, number>;
   const profileAreaValues = [
     { label: 'Atención', value: (profileAnswers.attention ?? 0) * 20 },
     { label: 'Comportamiento', value: (profileAnswers.behavior ?? 0) * 20 },
@@ -108,14 +108,12 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
   const weekDays = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
   const childInitial = childName.trim().charAt(0).toUpperCase() || 'H';
 
-  // Progreso real (semana actual)
   const weekStart = startOfWeek(new Date());
   const completedThisWeek = completions.filter((c) => new Date(c.date) >= weekStart);
   const weeklyGoal = 7;
   const progressPct = Math.min(Math.round((completedThisWeek.length / weeklyGoal) * 100), 100);
   const activeDays = new Set(completedThisWeek.map((c) => (new Date(c.date).getDay() + 6) % 7));
 
-  // Recomendaciones (según el perfil, sin repetir las de hoy)
   const todayStr = new Date().toDateString();
   const doneTodayTitles = new Set(
     completions.filter((c) => new Date(c.date).toDateString() === todayStr).map((c) => c.title)
@@ -178,4 +176,182 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
           </div>
         </section>
       ) : activeTab === 'progreso' ? (
-        <section
+        <section className="progress-screen">
+          <div className="week-selector-row">
+            <button type="button" className="week-button" onClick={() => setWeekOffset((offset) => offset + 1)}>‹</button>
+            <div>
+              <p className="eyebrow">Semana</p>
+              <strong>{weekLabel}</strong>
+            </div>
+            <button type="button" className="week-button" onClick={() => setWeekOffset((offset) => Math.max(0, offset - 1))} disabled={weekOffset === 0}>›</button>
+          </div>
+          <section className="bar-chart-card">
+            <div className="section-header"><div><p className="eyebrow">Gráfica semanal</p><h2>Actividades completadas</h2></div></div>
+            <div className="bar-chart">
+              {weeklyProgress.map((value, index) => (
+                <div key={index} className="bar-column">
+                  <div className="bar-fill" style={{ height: `${Math.min(value * 14, 100)}%` }} />
+                  <span>{weekDays[index]}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+          <section className="summary-grid">
+            <article className="summary-card"><p className="summary-label">Total esta semana</p><strong>{totalActivities} actividades</strong></article>
+            <article className="summary-card"><p className="summary-label">Racha</p><strong>🔥 {streak} días seguidos</strong></article>
+            <article className="summary-card"><p className="summary-label">Mejora</p><strong>+{improvement}% vs semana anterior</strong></article>
+          </section>
+          <section className="badges-section">
+            <div className="section-header"><div><p className="eyebrow">Logros desbloqueados</p><h2>Medallas de la semana</h2></div></div>
+            <div className="badge-grid">
+              <div className="badge-card badge-purple"><span>🏅</span><strong>Primera semana</strong></div>
+              <div className="badge-card badge-green"><span>🔥</span><strong>5 días seguidos</strong></div>
+              <div className="badge-card badge-yellow"><span>🎯</span><strong>10 actividades</strong></div>
+            </div>
+          </section>
+          <section className="notes-section">
+            <div className="section-header"><div><p className="eyebrow">Notas de la semana</p><h2>Observaciones para la familia</h2></div></div>
+            <textarea className="notes-field" placeholder="Escribe aquí cómo fue la semana, qué funcionó mejor o qué quieres recordar..." />
+          </section>
+        </section>
+      ) : activeTab === 'perfil' ? (
+        <section className="profile-screen">
+          <div className="profile-header">
+            <div className="profile-avatar">{childInitial}</div>
+            <div>
+              <h2>{childName}</h2>
+              <p className="profile-meta">{childAge ? `${childAge} años` : 'Edad no registrada'}</p>
+              <span className="condition-badge">{childProfile}</span>
+            </div>
+          </div>
+          <section className="neurocard">
+            <div className="card-header"><div><p className="eyebrow">Perfil neurodivergente</p><h2>Resultados del cuestionario</h2></div></div>
+            <div className="bar-list">
+              {profileAreaValues.map((area) => (
+                <div key={area.label} className="bar-row">
+                  <span className="bar-label">{area.label}</span>
+                  <div className="bar-track"><span className="bar-level" style={{ width: `${area.value}%` }} /></div>
+                  <strong>{area.value}%</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+          <section className="chip-section">
+            <div>
+              <p className="eyebrow">Fortalezas</p>
+              <div className="chip-group">{strengths.map((item) => (<span key={item} className="chip chip-green">{item}</span>))}</div>
+            </div>
+            <div>
+              <p className="eyebrow">Áreas de apoyo</p>
+              <div className="chip-group">{supportAreas.map((item) => (<span key={item} className="chip chip-purple">{item}</span>))}</div>
+            </div>
+          </section>
+          <div className="profile-actions">
+            <button className="secondary-button">Editar perfil</button>
+            <button className="primary-button">Compartir con terapeuta</button>
+          </div>
+          <section className="history-section">
+            <div className="section-header"><div><p className="eyebrow">Historial de evaluaciones</p><h2>Registros recientes</h2></div></div>
+            <ul className="history-list"><li className="history-item"><strong>Cuestionario inicial</strong><span>Reciente</span></li></ul>
+          </section>
+        </section>
+      ) : activeTab === 'cuenta' ? (
+        <section className="account-screen">
+          <div className="account-header">
+            <div className="account-avatar">{parentName.trim().charAt(0).toUpperCase()}</div>
+            <div><h2>{parentName}</h2><p>{parentEmail}</p></div>
+          </div>
+          <section className="plan-card plan-free">
+            <div className="plan-card-header"><p className="eyebrow">Plan actual</p><h2>Plan Gratuito</h2></div>
+            <ul className="plan-list"><li>Limitación a 1 perfil</li><li>Acceso básico a actividades</li><li>Sin reportes PDF</li><li>Incluye anuncios suaves</li><li>Soporte estándar</li></ul>
+          </section>
+          <section className="plan-card plan-premium">
+            <div className="plan-card-header"><p className="eyebrow">Plan Familiar</p><h2>$14.99/mes</h2><p className="plan-subtitle">o $109/año (ahorra 39%)</p></div>
+            <ul className="plan-list"><li>Perfiles ilimitados</li><li>Todas las actividades desbloqueadas</li><li>Reportes PDF descargables</li><li>Sin anuncios</li><li>Soporte prioritario</li></ul>
+            <button className="primary-button upgrade-button">Actualizar a Plan Familiar</button>
+          </section>
+          <section className="settings-section">
+            <div className="section-header"><div><p className="eyebrow">Configuración</p><h2>Ajustes rápidos</h2></div></div>
+            <div className="setting-item">Notificaciones</div>
+            <div className="setting-item">Idioma</div>
+            <div className="setting-item">Privacidad</div>
+          </section>
+          <section className="share-section"><button className="secondary-button share-button"><span>🔗</span> Compartir NeuroBright</button></section>
+          <button className="signout-red-button" onClick={onSignOut}>Cerrar sesión</button>
+        </section>
+      ) : (
+        <>
+          <section className="profile-card">
+            <div className="profile-row">
+              <div className="avatar-circle">{childInitial}</div>
+              <div>
+                <p className="profile-label">Perfil del hijo/a</p>
+                <h2>{childName}{childAge ? `, ${childAge} años` : ''}</h2>
+                <p className="profile-condition">{childProfile ? `Perfil detectado: ${childProfile}` : 'Perfil en evaluación'}</p>
+              </div>
+            </div>
+            <div className="profile-stats">
+              <div><span>Edad</span><strong>{childAge ?? '-'}</strong></div>
+              <div><span>Perfil</span><strong>{childProfile || 'No disponible'}</strong></div>
+              <div><span>Objetivo</span><strong>{dashboardObjective}</strong></div>
+            </div>
+          </section>
+
+          <section className="activity-section">
+            <div className="section-header"><div><p className="eyebrow">Recomendado para hoy</p><h2>Qué hacer ahora</h2></div></div>
+            <div className="activity-list">
+              {recommended.length === 0 ? (
+                <p style={{ color: '#6b6b85' }}>¡Completaste las actividades de hoy! 🎉 Vuelve mañana para seguir avanzando.</p>
+              ) : (
+                recommended.map((activity) => (
+                  <button key={activity.title} className="activity-item" onClick={() => setActiveActivity(activity)} style={{ width: '100%', textAlign: 'left', border: 'none', background: 'transparent', cursor: 'pointer' }}>
+                    <div className="activity-icon">{activity.icon}</div>
+                    <div><strong>{activity.title}</strong><p>{activity.description}</p></div>
+                  </button>
+                ))
+              )}
+            </div>
+          </section>
+
+          <section className="progress-section">
+            <div className="section-header"><div><p className="eyebrow">Progreso semanal</p><h2>Avance actual</h2></div></div>
+            <div className="progress-card">
+              <div className="progress-label-row">
+                <span>{progressPct}% cumplido</span>
+                <strong>{completedThisWeek.length}/{weeklyGoal} objetivos</strong>
+              </div>
+              <div className="progress-bar">
+                <span className="progress-fill" style={{ width: `${progressPct}%` }} />
+              </div>
+              <div className="progress-days">
+                {weekDays.map((d, i) => (
+                  <span key={i} style={activeDays.has(i) ? { color: '#6C63FF', fontWeight: 700 } : undefined}>{d}</span>
+                ))}
+              </div>
+            </div>
+          </section>
+        </>
+      )}
+
+      <button className="fab-button" aria-label="Agregar registro del día">+</button>
+
+      {activeActivity && (
+        <ActivityScreen
+          activity={activeActivity}
+          childAge={childAge}
+          onClose={() => setActiveActivity(null)}
+          onComplete={handleActivityComplete}
+        />
+      )}
+
+      <nav className="bottom-nav" aria-label="Barra de navegación">
+        {Object.entries(tabLabels).map(([tab, label]) => (
+          <button key={tab} className={activeTab === tab ? 'nav-item active' : 'nav-item'} onClick={() => setActiveTab(tab as Tab)}>
+            <span className="nav-icon">{tab === 'inicio' ? '🏠' : tab === 'perfil' ? '👤' : tab === 'actividades' ? '🗂️' : tab === 'progreso' ? '📊' : '⚙️'}</span>
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
+}
