@@ -515,6 +515,7 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
       {activeActivity && (
         <ActivityScreen
           activity={activeActivity}
+          childAge={childAge}
           onClose={() => setActiveActivity(null)}
           onComplete={(a) => console.log('Actividad completada:', a.title)}
         />

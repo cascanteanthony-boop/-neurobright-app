@@ -13,6 +13,7 @@ interface BodyProps {
   activity: ActivityInfo;
   onClose: () => void;
   onComplete: (activity: ActivityInfo) => void;
+  childAge?: number;
 }
 
 const TOTAL_CYCLES = 4;
@@ -20,8 +21,7 @@ const CYCLE_SECONDS = 19;
 
 const primaryBtn = (color: string): CSSProperties => ({
   width: '100%', padding: 14, borderRadius: 14, border: 'none',
-  background: color, color: '#fff', fontSize: 16, fontWeight: 600,
-  cursor: 'pointer', marginBottom: 12
+  background: color, color: '#fff', fontSize: 16, fontWeight: 600, cursor: 'pointer', marginBottom: 12
 });
 const completeBtn: CSSProperties = {
   width: '100%', padding: 14, borderRadius: 14, border: 'none',
@@ -73,10 +73,7 @@ function BreathingExercise({ activity, onClose, onComplete }: BodyProps) {
     intervalRef.current = window.setInterval(() => {
       setElapsed((e) => {
         if (e + 1 >= CYCLE_SECONDS) {
-          setCycle((c) => {
-            if (c >= TOTAL_CYCLES) { setRunning(false); setFinished(true); return c; }
-            return c + 1;
-          });
+          setCycle((c) => { if (c >= TOTAL_CYCLES) { setRunning(false); setFinished(true); return c; } return c + 1; });
           return 0;
         }
         return e + 1;
@@ -122,10 +119,15 @@ function BreathingExercise({ activity, onClose, onComplete }: BodyProps) {
   );
 }
 
-// Juego de memoria (parejas)
-const MEMORY_EMOJIS = ['🐶', '🐱', '🦊', '🐰', '🐸', '🐵'];
-
+// Juego de memoria adaptativo por edad
 interface Card { id: number; emoji: string; matched: boolean; }
+
+function getEmojisForAge(age?: number): string[] {
+  const a = age ?? 7;
+  if (a <= 5) return ['🐶', '🐱', '🐰', '🐸'];                                  // 4 parejas
+  if (a <= 7) return ['🐶', '🐱', '🦊', '🐰', '🐸', '🐵'];                       // 6 parejas
+  return ['🚀', '⚽', '🎸', '🎨', '🍎', '🌟', '🚗', '🦋'];                        // 8 parejas (objetos)
+}
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -136,16 +138,19 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function buildDeck(): Card[] {
-  const pairs = [...MEMORY_EMOJIS, ...MEMORY_EMOJIS];
+function buildDeck(age?: number): Card[] {
+  const emojis = getEmojisForAge(age);
+  const pairs = [...emojis, ...emojis];
   return shuffle(pairs).map((emoji, index) => ({ id: index, emoji, matched: false }));
 }
 
-function MemoryGame({ activity, onClose, onComplete }: BodyProps) {
-  const [cards, setCards] = useState<Card[]>(buildDeck);
+function MemoryGame({ activity, onClose, onComplete, childAge }: BodyProps) {
+  const [cards, setCards] = useState<Card[]>(() => buildDeck(childAge));
   const [flipped, setFlipped] = useState<number[]>([]);
   const [moves, setMoves] = useState(0);
   const [lock, setLock] = useState(false);
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [finalSeconds, setFinalSeconds] = useState<number | null>(null);
 
   const matchedCount = cards.filter((c) => c.matched).length;
   const won = matchedCount === cards.length;
@@ -154,6 +159,7 @@ function MemoryGame({ activity, onClose, onComplete }: BodyProps) {
     if (lock || won) return;
     if (cards[index].matched || flipped.includes(index) || flipped.length === 2) return;
 
+    if (startTime === null) setStartTime(Date.now());
     playSound('flip');
     const next = [...flipped, index];
     setFlipped(next);
@@ -167,7 +173,12 @@ function MemoryGame({ activity, onClose, onComplete }: BodyProps) {
         setTimeout(() => {
           setCards((prev) => prev.map((c, i) => (i === a || i === b ? { ...c, matched: true } : c)));
           setFlipped([]); setLock(false);
-          playSound(willWin ? 'win' : 'match');
+          if (willWin) {
+            setFinalSeconds(startTime ? Math.round((Date.now() - startTime) / 1000) : 0);
+            playSound('win');
+          } else {
+            playSound('match');
+          }
         }, 600);
       } else {
         setTimeout(() => { setFlipped([]); setLock(false); }, 900);
@@ -175,7 +186,10 @@ function MemoryGame({ activity, onClose, onComplete }: BodyProps) {
     }
   };
 
-  const restart = () => { setCards(buildDeck()); setFlipped([]); setMoves(0); setLock(false); };
+  const restart = () => {
+    setCards(buildDeck(childAge)); setFlipped([]); setMoves(0); setLock(false);
+    setStartTime(null); setFinalSeconds(null);
+  };
 
   return (
     <>
@@ -191,8 +205,8 @@ function MemoryGame({ activity, onClose, onComplete }: BodyProps) {
               key={card.id}
               onClick={() => handleFlip(index)}
               style={{
-                aspectRatio: '1 / 1', minHeight: 60, borderRadius: 12, border: 'none',
-                cursor: faceUp ? 'default' : 'pointer', fontSize: 26,
+                aspectRatio: '1 / 1', minHeight: 56, borderRadius: 12, border: 'none',
+                cursor: faceUp ? 'default' : 'pointer', fontSize: 24,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: card.matched ? `${activity.color}22` : faceUp ? '#fff' : activity.color,
                 boxShadow: faceUp ? `inset 0 0 0 2px ${activity.color}55` : '0 4px 10px rgba(0,0,0,0.12)',
@@ -206,7 +220,7 @@ function MemoryGame({ activity, onClose, onComplete }: BodyProps) {
       </div>
       {won && (
         <p style={{ textAlign: 'center', color: '#2e9e5b', fontWeight: 700, marginBottom: 12 }}>
-          ¡Ganaste! 🎉 Lo lograste en {moves} intentos
+          ¡Ganaste! 🎉 {moves} intentos{finalSeconds !== null ? ` · ${finalSeconds}s` : ''}
         </p>
       )}
       <button onClick={restart} style={backBtn}>Reiniciar</button>
@@ -227,10 +241,7 @@ function TimerExercise({ activity, onClose, onComplete }: BodyProps) {
   useEffect(() => {
     if (!running) return;
     intervalRef.current = window.setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) { setRunning(false); setFinished(true); return 0; }
-        return s - 1;
-      });
+      setSecondsLeft((s) => { if (s <= 1) { setRunning(false); setFinished(true); return 0; } return s - 1; });
     }, 1000);
     return () => { if (intervalRef.current) window.clearInterval(intervalRef.current); };
   }, [running]);
@@ -258,7 +269,7 @@ function TimerExercise({ activity, onClose, onComplete }: BodyProps) {
   );
 }
 
-export default function ActivityScreen({ activity, onClose, onComplete }: BodyProps) {
+export default function ActivityScreen({ activity, onClose, onComplete, childAge }: BodyProps) {
   const isBreathing = activity.title.includes('Respiración');
   const isMemory = activity.title.toLowerCase().includes('memoria');
 
@@ -274,7 +285,7 @@ export default function ActivityScreen({ activity, onClose, onComplete }: BodyPr
         {isBreathing
           ? <BreathingExercise activity={activity} onClose={onClose} onComplete={onComplete} />
           : isMemory
-          ? <MemoryGame activity={activity} onClose={onClose} onComplete={onComplete} />
+          ? <MemoryGame activity={activity} onClose={onClose} onComplete={onComplete} childAge={childAge} />
           : <TimerExercise activity={activity} onClose={onClose} onComplete={onComplete} />}
       </div>
     </div>
