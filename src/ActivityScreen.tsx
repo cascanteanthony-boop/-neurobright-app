@@ -16,7 +16,7 @@ interface BodyProps {
 }
 
 const TOTAL_CYCLES = 4;
-const CYCLE_SECONDS = 19; // 4 inhala + 7 sostén + 8 exhala
+const CYCLE_SECONDS = 19;
 
 const primaryBtn = (color: string): CSSProperties => ({
   width: '100%', padding: 14, borderRadius: 14, border: 'none',
@@ -33,7 +33,34 @@ const backBtn: CSSProperties = {
   background: '#fff', color: '#6b6b85', fontSize: 15, cursor: 'pointer', marginBottom: 10
 };
 
-// ── Respiración 4-7-8 ─────────────────────────────────────────
+// Sonidos generados por el navegador (sin archivos)
+let audioCtx: AudioContext | null = null;
+function playSound(type: 'flip' | 'match' | 'win') {
+  try {
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!audioCtx) audioCtx = new Ctx();
+    const ctx = audioCtx;
+    const now = ctx.currentTime;
+    const notes = type === 'flip' ? [523] : type === 'match' ? [659, 784] : [523, 659, 784, 1047];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const start = now + i * 0.12;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.2, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.25);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.3);
+    });
+  } catch {
+    // si el navegador bloquea el audio, lo ignoramos
+  }
+}
+
+// Respiración 4-7-8
 function BreathingExercise({ activity, onClose, onComplete }: BodyProps) {
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -95,31 +122,7 @@ function BreathingExercise({ activity, onClose, onComplete }: BodyProps) {
   );
 }
 
-// ── Juego de memoria (parejas) let audioCtx: AudioContext | null = null;
-function playSound(type: 'flip' | 'match' | 'win') {
-  try {
-    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!audioCtx) audioCtx = new Ctx();
-    const ctx = audioCtx;
-    const now = ctx.currentTime;
-    const notes = type === 'flip' ? [523] : type === 'match' ? [659, 784] : [523, 659, 784, 1047];
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      const start = now + i * 0.12;
-      gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.2, start + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.25);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(start);
-      osc.stop(start + 0.3);
-    });
-  } catch {
-    // si el navegador bloquea el audio, lo ignoramos
-  }
-}────────────────────────────────
+// Juego de memoria (parejas)
 const MEMORY_EMOJIS = ['🐶', '🐱', '🦊', '🐰', '🐸', '🐵'];
 
 interface Card { id: number; emoji: string; matched: boolean; }
@@ -147,7 +150,7 @@ function MemoryGame({ activity, onClose, onComplete }: BodyProps) {
   const matchedCount = cards.filter((c) => c.matched).length;
   const won = matchedCount === cards.length;
 
- const handleFlip = (index: number) => {
+  const handleFlip = (index: number) => {
     if (lock || won) return;
     if (cards[index].matched || flipped.includes(index) || flipped.length === 2) return;
 
@@ -180,7 +183,6 @@ function MemoryGame({ activity, onClose, onComplete }: BodyProps) {
         <span>Parejas: {matchedCount / 2} / {cards.length / 2}</span>
         <span>Intentos: {moves}</span>
       </div>
-
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
         {cards.map((card, index) => {
           const faceUp = card.matched || flipped.includes(index);
@@ -202,13 +204,11 @@ function MemoryGame({ activity, onClose, onComplete }: BodyProps) {
           );
         })}
       </div>
-
       {won && (
         <p style={{ textAlign: 'center', color: '#2e9e5b', fontWeight: 700, marginBottom: 12 }}>
           ¡Ganaste! 🎉 Lo lograste en {moves} intentos
         </p>
       )}
-
       <button onClick={restart} style={backBtn}>Reiniciar</button>
       <button onClick={() => { onComplete(activity); onClose(); }} style={completeBtn}>Completar actividad</button>
       <button onClick={onClose} style={backBtn}>Volver</button>
@@ -216,7 +216,7 @@ function MemoryGame({ activity, onClose, onComplete }: BodyProps) {
   );
 }
 
-// ── Temporizador genérico (resto de actividades) ──────────────
+// Temporizador genérico
 function TimerExercise({ activity, onClose, onComplete }: BodyProps) {
   const totalSeconds = activity.duration * 60;
   const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
