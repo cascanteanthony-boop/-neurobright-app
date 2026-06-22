@@ -14,6 +14,7 @@ interface BodyProps {
   onClose: () => void;
   onComplete: (activity: ActivityInfo) => void;
   childAge?: number;
+  childLevel?: number;
 }
 
 const TOTAL_CYCLES = 4;
@@ -35,12 +36,29 @@ const backBtn: CSSProperties = {
 
 // Sonidos generados por el navegador (sin archivos)
 let audioCtx: AudioContext | null = null;
-function playSound(type: 'flip' | 'match' | 'win') {
+function playSound(type: 'flip' | 'match' | 'win' | 'bubble') {
   try {
     const Ctx = window.AudioContext || (window as any).webkitAudioContext;
     if (!audioCtx) audioCtx = new Ctx();
     const ctx = audioCtx;
     const now = ctx.currentTime;
+
+    if (type === 'bubble') {
+      // pop suave y descendente, agradable para actividad sensorial
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(520, now);
+      osc.frequency.exponentialRampToValueAtTime(180, now + 0.18);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.16, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.22);
+      return;
+    }
+
     const notes = type === 'flip' ? [523] : type === 'match' ? [659, 784] : [523, 659, 784, 1047];
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
@@ -122,13 +140,6 @@ function BreathingExercise({ activity, onClose, onComplete }: BodyProps) {
 // Juego de memoria adaptativo por edad
 interface Card { id: number; emoji: string; matched: boolean; }
 
-function getEmojisForAge(age?: number): string[] {
-  const a = age ?? 7;
-  if (a <= 5) return ['🐶', '🐱', '🐰', '🐸'];                                  // 4 parejas
-  if (a <= 7) return ['🐶', '🐱', '🦊', '🐰', '🐸', '🐵'];                       // 6 parejas
-  return ['🚀', '⚽', '🎸', '🎨', '🍎', '🌟', '🚗', '🦋'];                        // 8 parejas (objetos)
-}
-
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -138,14 +149,26 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function buildDeck(age?: number): Card[] {
-  const emojis = getEmojisForAge(age);
-  const pairs = [...emojis, ...emojis];
-  return shuffle(pairs).map((emoji, index) => ({ id: index, emoji, matched: false }));
+// Parejas según EDAD (base) y NIVEL (progresión semanal). Tope 10 parejas.
+function getMemoryEmojis(age: number | undefined, level: number): string[] {
+  const a = age ?? 7;
+  const youngPool = ['🐶', '🐱', '🐰', '🐸', '🦊', '🐵', '🐼', '🐯', '🦁', '🐮'];
+  const olderPool = ['🚀', '⚽', '🎸', '🎨', '🍎', '🌟', '🚗', '🦋', '🌈', '🎁', '🪁', '🧩'];
+  const pool = shuffle(a <= 7 ? youngPool : olderPool);
+  const basePairs = a <= 5 ? 4 : a <= 7 ? 6 : 8;
+  const pairs = Math.min(basePairs + (level - 1), 10, pool.length);
+  return pool.slice(0, pairs);
 }
 
-function MemoryGame({ activity, onClose, onComplete, childAge }: BodyProps) {
-  const [cards, setCards] = useState<Card[]>(() => buildDeck(childAge));
+function buildDeck(age: number | undefined, level: number): Card[] {
+  const emojis = getMemoryEmojis(age, level);
+  const cards = [...emojis, ...emojis];
+  return shuffle(cards).map((emoji, index) => ({ id: index, emoji, matched: false }));
+}
+
+function MemoryGame({ activity, onClose, onComplete, childAge, childLevel }: BodyProps) {
+  const level = childLevel ?? 1;
+  const [cards, setCards] = useState<Card[]>(() => buildDeck(childAge, level));
   const [flipped, setFlipped] = useState<number[]>([]);
   const [moves, setMoves] = useState(0);
   const [lock, setLock] = useState(false);
@@ -187,12 +210,15 @@ function MemoryGame({ activity, onClose, onComplete, childAge }: BodyProps) {
   };
 
   const restart = () => {
-    setCards(buildDeck(childAge)); setFlipped([]); setMoves(0); setLock(false);
+    setCards(buildDeck(childAge, level)); setFlipped([]); setMoves(0); setLock(false);
     setStartTime(null); setFinalSeconds(null);
   };
 
   return (
     <>
+      <div style={{ textAlign: 'center', marginBottom: 8 }}>
+        <span style={{ display: 'inline-block', background: `${activity.color}22`, color: activity.color, fontSize: 12, fontWeight: 700, padding: '3px 12px', borderRadius: 999 }}>Nivel {level}</span>
+      </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b6b85', fontSize: 14, marginBottom: 12 }}>
         <span>Parejas: {matchedCount / 2} / {cards.length / 2}</span>
         <span>Intentos: {moves}</span>
@@ -224,6 +250,103 @@ function MemoryGame({ activity, onClose, onComplete, childAge }: BodyProps) {
         </p>
       )}
       <button onClick={restart} style={backBtn}>Reiniciar</button>
+      <button onClick={() => { onComplete(activity); onClose(); }} style={completeBtn}>Completar actividad</button>
+      <button onClick={onClose} style={backBtn}>Volver</button>
+    </>
+  );
+}
+
+// Burbujas de calma (actividad sensorial)
+interface Bubble { id: number; left: number; size: number; color: string; duration: number; popping?: boolean; }
+
+const BUBBLE_COLORS = ['#A8E6CF', '#DCEDC1', '#FFD3B6', '#B5D8FF', '#D7BDE2', '#FFAAA5', '#C7CEEA'];
+const PLAY_HEIGHT = 320;
+
+// Configuración de burbujas según edad: más pequeños = más grandes, lentas y pocas
+function getBubbleConfig(age?: number) {
+  const a = age ?? 7;
+  if (a <= 5) return { minSize: 64, sizeRange: 40, minDur: 8, durRange: 4, max: 5, spawnMs: 1200 };
+  if (a <= 9) return { minSize: 50, sizeRange: 36, minDur: 6.5, durRange: 3.5, max: 7, spawnMs: 950 };
+  return { minSize: 44, sizeRange: 34, minDur: 6, durRange: 3, max: 8, spawnMs: 850 };
+}
+
+function SensoryBubbles({ activity, onClose, onComplete, childAge }: BodyProps) {
+  const [bubbles, setBubbles] = useState<Bubble[]>([]);
+  const [popped, setPopped] = useState(0);
+  const [muted, setMuted] = useState(false);
+  const idRef = useRef(0);
+
+  useEffect(() => {
+    const cfg = getBubbleConfig(childAge);
+    const spawn = () => {
+      setBubbles((prev) => {
+        if (prev.length >= cfg.max) return prev; // límite suave: no saturar los sentidos
+        const id = idRef.current++;
+        const size = cfg.minSize + Math.random() * cfg.sizeRange;
+        return [...prev, {
+          id,
+          left: 4 + Math.random() * 78,
+          size,
+          color: BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)],
+          duration: cfg.minDur + Math.random() * cfg.durRange
+        }];
+      });
+    };
+    spawn();
+    const interval = window.setInterval(spawn, cfg.spawnMs);
+    return () => window.clearInterval(interval);
+  }, [childAge]);
+
+  const removeBubble = (id: number) => setBubbles((prev) => prev.filter((b) => b.id !== id));
+
+  const popBubble = (id: number) => {
+    if (!muted) playSound('bubble');
+    setBubbles((prev) => prev.map((b) => (b.id === id ? { ...b, popping: true } : b)));
+    setPopped((n) => n + 1);
+    window.setTimeout(() => removeBubble(id), 280);
+  };
+
+  return (
+    <>
+      <style>{`
+        @keyframes nb-float-up { from { transform: translateY(0); } to { transform: translateY(-540px); } }
+        @keyframes nb-pop { from { transform: scale(1); opacity: 0.9; } to { transform: scale(1.7); opacity: 0; } }
+      `}</style>
+      <p style={{ textAlign: 'center', color: '#6b6b85', fontSize: 14, marginBottom: 10 }}>
+        Toca las burbujas para reventarlas. No hay apuro 🫧
+      </p>
+      <div style={{ position: 'relative', height: PLAY_HEIGHT, overflow: 'hidden', borderRadius: 16, background: 'linear-gradient(180deg, #eef6ff, #f6f0ff)', marginBottom: 14 }}>
+        {bubbles.map((b) => (
+          <div
+            key={b.id}
+            onAnimationEnd={() => removeBubble(b.id)}
+            style={{
+              position: 'absolute', bottom: -90, left: `${b.left}%`,
+              width: b.size, height: b.size,
+              pointerEvents: b.popping ? 'none' : 'auto',
+              animation: `nb-float-up ${b.duration}s linear forwards`
+            }}
+          >
+            <button
+              onClick={() => popBubble(b.id)}
+              aria-label="burbuja"
+              style={{
+                width: '100%', height: '100%', borderRadius: '50%', border: 'none', padding: 0,
+                cursor: 'pointer',
+                background: `radial-gradient(circle at 32% 28%, #ffffffcc, ${b.color})`,
+                boxShadow: `0 6px 16px ${b.color}88, inset 0 0 12px #ffffff66`,
+                animation: b.popping ? 'nb-pop 0.3s ease-out forwards' : undefined
+              }}
+            />
+          </div>
+        ))}
+        <div style={{ position: 'absolute', top: 10, right: 12, fontSize: 13, color: '#7a7a99', background: '#ffffffcc', padding: '2px 10px', borderRadius: 999 }}>
+          Burbujas: {popped}
+        </div>
+      </div>
+      <button onClick={() => setMuted((m) => !m)} style={backBtn}>
+        {muted ? '🔇 Sonido apagado' : '🔊 Sonido encendido'}
+      </button>
       <button onClick={() => { onComplete(activity); onClose(); }} style={completeBtn}>Completar actividad</button>
       <button onClick={onClose} style={backBtn}>Volver</button>
     </>
@@ -269,9 +392,10 @@ function TimerExercise({ activity, onClose, onComplete }: BodyProps) {
   );
 }
 
-export default function ActivityScreen({ activity, onClose, onComplete, childAge }: BodyProps) {
+export default function ActivityScreen({ activity, onClose, onComplete, childAge, childLevel }: BodyProps) {
   const isBreathing = activity.title.includes('Respiración');
   const isMemory = activity.title.toLowerCase().includes('memoria');
+  const isSensory = activity.title.toLowerCase().includes('sensorial');
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(25, 25, 50, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
@@ -285,7 +409,9 @@ export default function ActivityScreen({ activity, onClose, onComplete, childAge
         {isBreathing
           ? <BreathingExercise activity={activity} onClose={onClose} onComplete={onComplete} />
           : isMemory
-          ? <MemoryGame activity={activity} onClose={onClose} onComplete={onComplete} childAge={childAge} />
+          ? <MemoryGame activity={activity} onClose={onClose} onComplete={onComplete} childAge={childAge} childLevel={childLevel} />
+          : isSensory
+          ? <SensoryBubbles activity={activity} onClose={onClose} onComplete={onComplete} childAge={childAge} />
           : <TimerExercise activity={activity} onClose={onClose} onComplete={onComplete} />}
       </div>
     </div>

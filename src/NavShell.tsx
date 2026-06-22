@@ -114,6 +114,18 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
   const progressPct = Math.min(Math.round((completedThisWeek.length / weeklyGoal) * 100), 100);
   const activeDays = new Set(completedThisWeek.map((c) => (new Date(c.date).getDay() + 6) % 7));
 
+  // Nivel: sube 1 por cada semana PASADA en que se cumplió la meta (derivado del historial)
+  const weekCounts: Record<string, number> = {};
+  completions.forEach((c) => {
+    const ws = startOfWeek(new Date(c.date)).toISOString();
+    weekCounts[ws] = (weekCounts[ws] ?? 0) + 1;
+  });
+  const currentWeekIso = weekStart.toISOString();
+  const pastWeeksMetGoal = Object.entries(weekCounts).filter(
+    ([ws, count]) => ws !== currentWeekIso && count >= weeklyGoal
+  ).length;
+  const childLevel = 1 + pastWeeksMetGoal;
+
   const todayStr = new Date().toDateString();
   const doneTodayTitles = new Set(
     completions.filter((c) => new Date(c.date).toDateString() === todayStr).map((c) => c.title)
@@ -339,6 +351,7 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
         <ActivityScreen
           activity={activeActivity}
           childAge={childAge}
+          childLevel={childLevel}
           onClose={() => setActiveActivity(null)}
           onComplete={handleActivityComplete}
         />
