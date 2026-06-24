@@ -482,6 +482,113 @@ function EmotionDiary({ activity, onClose, onComplete, childAge, onEmotionLog }:
   );
 }
 
+// Tiempo de movimiento (rutina guiada)
+interface Move { emoji: string; name: string; instruction: string; seconds: number; }
+
+function getMovesForAge(age?: number): Move[] {
+  const a = age ?? 7;
+  if (a <= 6) return [
+    { emoji: '🦘', name: 'Saltos de canguro', instruction: 'Salta suave en tu lugar.', seconds: 12 },
+    { emoji: '⭐', name: 'Estírate como estrella', instruction: 'Abre brazos y piernas bien grande.', seconds: 12 },
+    { emoji: '🐻', name: 'Camina como oso', instruction: 'Apoya manos y pies y camina despacio.', seconds: 12 },
+    { emoji: '🐢', name: 'Tortuga lenta', instruction: 'Muévete muy, muy despacito.', seconds: 12 },
+    { emoji: '🌬️', name: 'Respira y descansa', instruction: 'Respira hondo y baja los brazos despacio.', seconds: 14 }
+  ];
+  return [
+    { emoji: '🦘', name: 'Saltos de canguro', instruction: 'Salta en tu lugar con energía.', seconds: 12 },
+    { emoji: '⭐', name: 'Estrella que abre y cierra', instruction: 'Abre brazos y piernas, y vuelve a juntarlos.', seconds: 12 },
+    { emoji: '🙆', name: 'Cielo y suelo', instruction: 'Estírate hacia el cielo y baja a tocar tus pies.', seconds: 12 },
+    { emoji: '🐻', name: 'Caminata de oso', instruction: 'Camina con manos y pies en el piso.', seconds: 12 },
+    { emoji: '🦋', name: 'Alas de mariposa', instruction: 'Mueve los brazos como alas, lento y luego rápido.', seconds: 12 },
+    { emoji: '🐢', name: 'Tortuga lenta', instruction: 'Muévete muy despacio para ir calmándote.', seconds: 12 },
+    { emoji: '🧘', name: 'Calma final', instruction: 'Quédate quieto y siente tu respiración.', seconds: 15 }
+  ];
+}
+
+function MovementRoutine({ activity, onClose, onComplete, childAge }: BodyProps) {
+  const moves = getMovesForAge(childAge);
+  const [phase, setPhase] = useState<'intro' | 'running' | 'done'>('intro');
+  const [index, setIndex] = useState(0);
+  const [secondsLeft, setSecondsLeft] = useState(moves[0].seconds);
+  const [running, setRunning] = useState(false);
+  const intervalRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!running || phase !== 'running') return;
+    intervalRef.current = window.setInterval(() => {
+      setSecondsLeft((s) => Math.max(s - 1, 0));
+    }, 1000);
+    return () => { if (intervalRef.current) window.clearInterval(intervalRef.current); };
+  }, [running, phase]);
+
+  useEffect(() => {
+    if (phase !== 'running' || !running || secondsLeft > 0) return;
+    if (index + 1 >= moves.length) {
+      setRunning(false);
+      setPhase('done');
+    } else {
+      const ni = index + 1;
+      setIndex(ni);
+      setSecondsLeft(moves[ni].seconds);
+    }
+  }, [secondsLeft, phase, running, index, moves]);
+
+  const start = () => { setIndex(0); setSecondsLeft(moves[0].seconds); setPhase('running'); setRunning(true); };
+  const skip = () => {
+    if (index + 1 >= moves.length) { setRunning(false); setPhase('done'); }
+    else { const ni = index + 1; setIndex(ni); setSecondsLeft(moves[ni].seconds); }
+  };
+
+  if (phase === 'intro') {
+    return (
+      <>
+        <p style={{ textAlign: 'center', color: '#6b6b85', fontSize: 14, lineHeight: 1.5, marginBottom: 16 }}>
+          Vamos a mover el cuerpo 🤸 Sigue cada movimiento a tu ritmo. Si lo necesitas, puedes pausar o pasar al siguiente.
+        </p>
+        <p style={{ textAlign: 'center', color: '#2b2b55', fontWeight: 600, marginBottom: 16 }}>Son {moves.length} movimientos.</p>
+        <button onClick={start} style={primaryBtn(activity.color)}>Comenzar</button>
+        <button onClick={onClose} style={backBtn}>Volver</button>
+      </>
+    );
+  }
+
+  if (phase === 'done') {
+    return (
+      <>
+        <div style={{ textAlign: 'center', marginBottom: 12 }}>
+          <div style={{ fontSize: 56 }}>🎉</div>
+          <p style={{ color: '#2e9e5b', fontWeight: 700, fontSize: 18, margin: '8px 0' }}>¡Lo lograste!</p>
+          <p style={{ color: '#6b6b85', lineHeight: 1.5 }}>Moviste tu cuerpo y ahora puede sentirse más tranquilo.</p>
+        </div>
+        <button onClick={() => { onComplete(activity); onClose(); }} style={completeBtn}>Completar actividad</button>
+        <button onClick={onClose} style={backBtn}>Volver</button>
+      </>
+    );
+  }
+
+  const move = moves[index];
+  const progress = Math.round(((move.seconds - secondsLeft) / move.seconds) * 100);
+
+  return (
+    <>
+      <style>{`@keyframes nb-move-bounce { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-10px) scale(1.08); } }`}</style>
+      <p style={{ textAlign: 'center', color: '#6b6b85', fontSize: 13, marginBottom: 6 }}>Movimiento {index + 1} de {moves.length}</p>
+      <div style={{ textAlign: 'center', marginBottom: 10 }}>
+        <div style={{ fontSize: 72, animation: running ? 'nb-move-bounce 1s ease-in-out infinite' : undefined, filter: 'drop-shadow(0 6px 8px rgba(0,0,0,0.22))' }}>{move.emoji}</div>
+        <h3 style={{ margin: '8px 0 4px', color: '#2b2b55' }}>{move.name}</h3>
+        <p style={{ color: '#6b6b85', margin: 0, lineHeight: 1.5 }}>{move.instruction}</p>
+      </div>
+      <div style={{ fontSize: 32, fontWeight: 700, color: activity.color, textAlign: 'center', marginBottom: 6 }}>{secondsLeft}s</div>
+      <div style={{ height: 8, background: '#eeeeee', borderRadius: 999, overflow: 'hidden', marginBottom: 16 }}>
+        <div style={{ height: '100%', width: `${progress}%`, background: activity.color, transition: 'width 0.3s' }} />
+      </div>
+      <button onClick={() => setRunning((r) => !r)} style={primaryBtn(activity.color)}>{running ? 'Pausar' : 'Continuar'}</button>
+      <button onClick={skip} style={backBtn}>Siguiente movimiento</button>
+      <button onClick={onClose} style={backBtn}>Volver</button>
+    </>
+  );
+}
+
 // Temporizador genérico
 function TimerExercise({ activity, onClose, onComplete }: BodyProps) {
   const totalSeconds = activity.duration * 60;
@@ -526,6 +633,7 @@ export default function ActivityScreen({ activity, onClose, onComplete, childAge
   const isMemory = activity.title.toLowerCase().includes('memoria');
   const isSensory = activity.title.toLowerCase().includes('sensorial');
   const isEmotions = activity.title.toLowerCase().includes('emociones');
+  const isMovement = activity.title.toLowerCase().includes('movimiento');
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(25, 25, 50, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
@@ -544,6 +652,8 @@ export default function ActivityScreen({ activity, onClose, onComplete, childAge
           ? <SensoryBubbles activity={activity} onClose={onClose} onComplete={onComplete} childAge={childAge} />
           : isEmotions
           ? <EmotionDiary activity={activity} onClose={onClose} onComplete={onComplete} childAge={childAge} onEmotionLog={onEmotionLog} />
+          : isMovement
+          ? <MovementRoutine activity={activity} onClose={onClose} onComplete={onComplete} childAge={childAge} />
           : <TimerExercise activity={activity} onClose={onClose} onComplete={onComplete} />}
       </div>
     </div>
