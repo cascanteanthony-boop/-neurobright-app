@@ -32,6 +32,7 @@ const tabLabels: Record<Tab, string> = {
 };
 
 interface Completion { title: string; category: string; date: string; }
+interface EmotionEntry { emotion: string; label: string; intensity: number; date: string; }
 
 function startOfWeek(d: Date): Date {
   const date = new Date(d);
@@ -57,16 +58,32 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
   const [completions, setCompletions] = useState<Completion[]>(
     () => ((userMetadata as any).completedActivities as Completion[]) ?? []
   );
+  const [emotionLog, setEmotionLog] = useState<EmotionEntry[]>(
+    () => ((userMetadata as any).emotionLog as EmotionEntry[]) ?? []
+  );
+
+  // Guarda ambos registros juntos para que uno no sobrescriba al otro
+  const persistData = async (nextCompletions: Completion[], nextEmotions: EmotionEntry[]) => {
+    try {
+      await supabase.auth.updateUser({
+        data: { ...userMetadata, completedActivities: nextCompletions, emotionLog: nextEmotions }
+      });
+    } catch (err) {
+      console.error('No se pudo guardar', err);
+    }
+  };
 
   const handleActivityComplete = async (activity: ActivityInfo) => {
     const entry: Completion = { title: activity.title, category: activity.category, date: new Date().toISOString() };
     const updated = [...completions, entry];
     setCompletions(updated);
-    try {
-      await supabase.auth.updateUser({ data: { ...userMetadata, completedActivities: updated } });
-    } catch (err) {
-      console.error('No se pudo guardar el progreso', err);
-    }
+    await persistData(updated, emotionLog);
+  };
+
+  const handleEmotionLog = async (entry: EmotionEntry) => {
+    const updated = [...emotionLog, entry];
+    setEmotionLog(updated);
+    await persistData(completions, updated);
   };
 
   const childName = userMetadata.childName ?? 'tu hijo/a';
@@ -354,6 +371,7 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
           childLevel={childLevel}
           onClose={() => setActiveActivity(null)}
           onComplete={handleActivityComplete}
+          onEmotionLog={handleEmotionLog}
         />
       )}
 

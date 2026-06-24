@@ -15,6 +15,7 @@ interface BodyProps {
   onComplete: (activity: ActivityInfo) => void;
   childAge?: number;
   childLevel?: number;
+  onEmotionLog?: (entry: { emotion: string; label: string; intensity: number; date: string }) => void;
 }
 
 const TOTAL_CYCLES = 4;
@@ -353,6 +354,134 @@ function SensoryBubbles({ activity, onClose, onComplete, childAge }: BodyProps) 
   );
 }
 
+// Diario de emociones (check-in emocional)
+interface Emotion { emoji: string; label: string; tone: 'bien' | 'dificil'; message: string; tip: string; }
+
+function getEmotionsForAge(age?: number): Emotion[] {
+  const base: Emotion[] = [
+    { emoji: '😊', label: 'Feliz', tone: 'bien', message: '¡Qué lindo sentirse feliz! Disfruta este momento.', tip: 'Comparte tu alegría con alguien que quieres.' },
+    { emoji: '😌', label: 'Tranquilo', tone: 'bien', message: 'Sentirse en calma es algo muy bueno.', tip: 'Guarda esta sensación; puedes volver a ella cuando la necesites.' },
+    { emoji: '😢', label: 'Triste', tone: 'dificil', message: 'Está bien sentirse triste, le pasa a todas las personas.', tip: 'Habla con alguien de confianza o haz un dibujo de cómo te sientes.' },
+    { emoji: '😠', label: 'Enojado', tone: 'dificil', message: 'El enojo es normal. Vamos a soltarlo de a poquito.', tip: 'Respira despacio 3 veces o abraza un cojín con suavidad.' },
+    { emoji: '😨', label: 'Asustado', tone: 'dificil', message: 'El miedo nos avisa para cuidarnos. Aquí estás a salvo.', tip: 'Respira hondo y cuéntale tu miedo a un adulto de confianza.' },
+    { emoji: '😴', label: 'Cansado', tone: 'dificil', message: 'Tu cuerpo te pide descanso. Vale la pena escucharlo.', tip: 'Busca un momento tranquilo para recargar energías.' }
+  ];
+  const a = age ?? 7;
+  if (a <= 6) return base;
+  return [
+    ...base,
+    { emoji: '😰', label: 'Nervioso', tone: 'dificil', message: 'Sentir nervios antes de algo importante es normal.', tip: 'Respira lento; la actividad de Burbujas de calma puede ayudarte.' },
+    { emoji: '😤', label: 'Frustrado', tone: 'dificil', message: 'La frustración aparece cuando algo cuesta. Es parte de aprender.', tip: 'Tómate un descanso corto y vuelve a intentarlo con calma.' },
+    { emoji: '🤩', label: 'Emocionado', tone: 'bien', message: '¡La emoción es energía buena!', tip: 'Cuéntale a alguien qué te emociona tanto.' }
+  ];
+}
+
+function EmotionDiary({ activity, onClose, onComplete, childAge, onEmotionLog }: BodyProps) {
+  const emotions = getEmotionsForAge(childAge);
+  const [step, setStep] = useState<'select' | 'intensity' | 'result'>('select');
+  const [selected, setSelected] = useState<Emotion | null>(null);
+  const [pressing, setPressing] = useState<string | null>(null);
+
+  const goodColor = '#4ECDC4';
+  const hardColor = '#FF8DAA';
+  const tone = selected?.tone === 'bien' ? goodColor : hardColor;
+
+  const pickEmotion = (e: Emotion) => {
+    setSelected(e);
+    setPressing(e.label);
+    window.setTimeout(() => { setStep('intensity'); setPressing(null); }, 360);
+  };
+
+  const confirmIntensity = (value: number) => {
+    if (selected && onEmotionLog) {
+      onEmotionLog({ emotion: selected.emoji, label: selected.label, intensity: value, date: new Date().toISOString() });
+    }
+    setStep('result');
+  };
+
+  const restart = () => { setSelected(null); setStep('select'); };
+
+  if (step === 'select') {
+    return (
+      <>
+        <style>{`
+          @keyframes nb-emo-pop { 0% { transform: scale(1); } 50% { transform: scale(1.32); } 100% { transform: scale(1.12); } }
+          @keyframes nb-emo-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+          .nb-emo { transition: transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s; will-change: transform; }
+          .nb-emo:hover { transform: translateY(-5px) scale(1.05); box-shadow: 0 14px 24px rgba(0,0,0,0.16); }
+          .nb-emo:active { transform: scale(.95); }
+          .nb-emo-emoji { display: inline-block; filter: drop-shadow(0 5px 7px rgba(0,0,0,0.28)); transition: transform .2s; animation: nb-emo-float 3s ease-in-out infinite; }
+          .nb-emo:hover .nb-emo-emoji { transform: scale(1.18) rotate(-4deg); }
+          .nb-emo-pressed .nb-emo-emoji { animation: nb-emo-pop .36s ease forwards; }
+        `}</style>
+        <p style={{ textAlign: 'center', color: '#6b6b85', fontSize: 14, marginBottom: 14 }}>
+          ¿Cómo te sientes hoy? No hay respuestas correctas ni incorrectas 💛
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+          {emotions.map((e) => (
+            <button
+              key={e.label}
+              onClick={() => pickEmotion(e)}
+              className={pressing === e.label ? 'nb-emo nb-emo-pressed' : 'nb-emo'}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                padding: '16px 6px', borderRadius: 18, border: 'none', cursor: 'pointer',
+                background: e.tone === 'bien'
+                  ? 'linear-gradient(160deg, #ffffff, #eafaf7)'
+                  : 'linear-gradient(160deg, #ffffff, #fdeef3)',
+                boxShadow: '0 6px 14px rgba(0,0,0,0.10)'
+              }}
+            >
+              <span className="nb-emo-emoji" style={{ fontSize: 40, lineHeight: 1 }}>{e.emoji}</span>
+              <span style={{ fontSize: 13, color: '#2b2b55', fontWeight: 600 }}>{e.label}</span>
+            </button>
+          ))}
+        </div>
+        <button onClick={onClose} style={backBtn}>Volver</button>
+      </>
+    );
+  }
+
+  if (step === 'intensity') {
+    return (
+      <>
+        <div style={{ textAlign: 'center', marginBottom: 8 }}>
+          <div style={{ fontSize: 48 }}>{selected?.emoji}</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#2b2b55' }}>{selected?.label}</div>
+        </div>
+        <p style={{ textAlign: 'center', color: '#6b6b85', fontSize: 14, marginBottom: 14 }}>¿Qué tan fuerte lo sientes?</p>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          {[{ v: 1, t: 'Poquito' }, { v: 2, t: 'Medio' }, { v: 3, t: 'Mucho' }].map((opt) => (
+            <button key={opt.v} onClick={() => confirmIntensity(opt.v)} style={{
+              flex: 1, padding: '14px 6px', borderRadius: 14, border: 'none', cursor: 'pointer',
+              background: tone, color: '#fff', fontWeight: 600, fontSize: 14
+            }}>{opt.t}</button>
+          ))}
+        </div>
+        <button onClick={() => setStep('select')} style={backBtn}>Atrás</button>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div style={{ textAlign: 'center', marginBottom: 10 }}>
+        <div style={{ fontSize: 48 }}>{selected?.emoji}</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: '#2b2b55' }}>{selected?.label}</div>
+      </div>
+      <div style={{ background: `${tone}18`, borderRadius: 16, padding: 16, marginBottom: 12 }}>
+        <p style={{ margin: '0 0 10px', color: '#2b2b55', lineHeight: 1.5 }}>{selected?.message}</p>
+        <p style={{ margin: 0, color: '#6b6b85', fontSize: 14, lineHeight: 1.5 }}>
+          <strong style={{ color: tone }}>Idea:</strong> {selected?.tip}
+        </p>
+      </div>
+      <button onClick={restart} style={backBtn}>Registrar otra emoción</button>
+      <button onClick={() => { onComplete(activity); onClose(); }} style={completeBtn}>Completar actividad</button>
+      <button onClick={onClose} style={backBtn}>Volver</button>
+    </>
+  );
+}
+
 // Temporizador genérico
 function TimerExercise({ activity, onClose, onComplete }: BodyProps) {
   const totalSeconds = activity.duration * 60;
@@ -392,10 +521,11 @@ function TimerExercise({ activity, onClose, onComplete }: BodyProps) {
   );
 }
 
-export default function ActivityScreen({ activity, onClose, onComplete, childAge, childLevel }: BodyProps) {
+export default function ActivityScreen({ activity, onClose, onComplete, childAge, childLevel, onEmotionLog }: BodyProps) {
   const isBreathing = activity.title.includes('Respiración');
   const isMemory = activity.title.toLowerCase().includes('memoria');
   const isSensory = activity.title.toLowerCase().includes('sensorial');
+  const isEmotions = activity.title.toLowerCase().includes('emociones');
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(25, 25, 50, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
@@ -412,6 +542,8 @@ export default function ActivityScreen({ activity, onClose, onComplete, childAge
           ? <MemoryGame activity={activity} onClose={onClose} onComplete={onComplete} childAge={childAge} childLevel={childLevel} />
           : isSensory
           ? <SensoryBubbles activity={activity} onClose={onClose} onComplete={onComplete} childAge={childAge} />
+          : isEmotions
+          ? <EmotionDiary activity={activity} onClose={onClose} onComplete={onComplete} childAge={childAge} onEmotionLog={onEmotionLog} />
           : <TimerExercise activity={activity} onClose={onClose} onComplete={onComplete} />}
       </div>
     </div>
