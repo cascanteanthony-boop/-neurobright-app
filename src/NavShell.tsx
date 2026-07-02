@@ -42,6 +42,16 @@ function startOfWeek(d: Date): Date {
   return date;
 }
 
+// Racha: días consecutivos (terminando hoy o ayer) con al menos una actividad
+function computeStreak(dates: string[]): number {
+  const days = new Set(dates.map((d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); }));
+  const cursor = new Date(); cursor.setHours(0, 0, 0, 0);
+  if (!days.has(cursor.getTime())) cursor.setDate(cursor.getDate() - 1);
+  let streak = 0;
+  while (days.has(cursor.getTime())) { streak++; cursor.setDate(cursor.getDate() - 1); }
+  return streak;
+}
+
 function priorityCategory(profile: string): string | null {
   const p = profile.toLowerCase();
   if (p.includes('tdah') || p.includes('atenci')) return 'Atención';
@@ -117,11 +127,6 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
     activityFilter === 'Todas' ? activitiesData : activitiesData.filter((activity) => activity.category === activityFilter);
 
   const [weekOffset, setWeekOffset] = useState(0);
-  const weeklyProgress = [3, 5, 4, 6, 2, 1, 0];
-  const totalActivities = weeklyProgress.reduce((sum, value) => sum + value, 0);
-  const streak = 4;
-  const improvement = 18;
-  const weekLabel = weekOffset === 0 ? 'Semana actual' : `Semana -${weekOffset}`;
   const weekDays = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
   const childInitial = childName.trim().charAt(0).toUpperCase() || 'H';
 
@@ -142,6 +147,50 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
     ([ws, count]) => ws !== currentWeekIso && count >= weeklyGoal
   ).length;
   const childLevel = 1 + pastWeeksMetGoal;
+
+  // ---- Datos reales de la pestaña Progreso (según la semana seleccionada) ----
+  const selectedWeekStart = new Date(weekStart);
+  selectedWeekStart.setDate(selectedWeekStart.getDate() - weekOffset * 7);
+  const selectedWeekEnd = new Date(selectedWeekStart);
+  selectedWeekEnd.setDate(selectedWeekEnd.getDate() + 7);
+
+  const weeklyProgress = [0, 0, 0, 0, 0, 0, 0];
+  completions.forEach((c) => {
+    const d = new Date(c.date);
+    if (d >= selectedWeekStart && d < selectedWeekEnd) {
+      weeklyProgress[(d.getDay() + 6) % 7]++;
+    }
+  });
+  const totalActivities = weeklyProgress.reduce((sum, value) => sum + value, 0);
+  const maxCount = Math.max(1, ...weeklyProgress);
+
+  const prevWeekStart = new Date(selectedWeekStart);
+  prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+  const prevTotal = completions.filter((c) => {
+    const d = new Date(c.date);
+    return d >= prevWeekStart && d < selectedWeekStart;
+  }).length;
+  let improvementLabel: string;
+  if (prevTotal === 0) {
+    improvementLabel = totalActivities > 0 ? '¡primera semana activa!' : 'sin datos aún';
+  } else {
+    const pct = Math.round(((totalActivities - prevTotal) / prevTotal) * 100);
+    improvementLabel = `${pct >= 0 ? '+' : ''}${pct}% vs semana anterior`;
+  }
+
+  const streak = computeStreak(completions.map((c) => c.date));
+  const weekLabel = weekOffset === 0 ? 'Semana actual' : `Hace ${weekOffset} semana${weekOffset > 1 ? 's' : ''}`;
+
+  const totalAllTime = completions.length;
+  const weekMetGoalEver = Object.values(weekCounts).some((count) => count >= weeklyGoal);
+  const badges = [
+    { emoji: '🌱', label: 'Primeros pasos', unlocked: totalAllTime >= 1 },
+    { emoji: '🔥', label: '3 días seguidos', unlocked: streak >= 3 },
+    { emoji: '⭐', label: '5 días seguidos', unlocked: streak >= 5 },
+    { emoji: '🎯', label: '10 actividades', unlocked: totalAllTime >= 10 },
+    { emoji: '🏅', label: 'Semana completa', unlocked: weekMetGoalEver },
+    { emoji: '🏆', label: '25 actividades', unlocked: totalAllTime >= 25 }
+  ];
 
   const todayStr = new Date().toDateString();
   const doneTodayTitles = new Set(
@@ -219,7 +268,8 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
             <div className="bar-chart">
               {weeklyProgress.map((value, index) => (
                 <div key={index} className="bar-column">
-                  <div className="bar-fill" style={{ height: `${Math.min(value * 14, 100)}%` }} />
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#6C63FF', lineHeight: 1, marginBottom: 4 }}>{value}</div>
+                  <div className="bar-fill" style={{ height: `${(value / maxCount) * 100}%` }} title={`${value} actividad${value === 1 ? '' : 'es'}`} />
                   <span>{weekDays[index]}</span>
                 </div>
               ))}
@@ -227,15 +277,21 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
           </section>
           <section className="summary-grid">
             <article className="summary-card"><p className="summary-label">Total esta semana</p><strong>{totalActivities} actividades</strong></article>
-            <article className="summary-card"><p className="summary-label">Racha</p><strong>🔥 {streak} días seguidos</strong></article>
-            <article className="summary-card"><p className="summary-label">Mejora</p><strong>+{improvement}% vs semana anterior</strong></article>
+            <article className="summary-card"><p className="summary-label">Racha</p><strong>🔥 {streak} día{streak === 1 ? '' : 's'} seguidos</strong></article>
+            <article className="summary-card"><p className="summary-label">Mejora</p><strong>{improvementLabel}</strong></article>
           </section>
           <section className="badges-section">
             <div className="section-header"><div><p className="eyebrow">Logros desbloqueados</p><h2>Medallas de la semana</h2></div></div>
             <div className="badge-grid">
-              <div className="badge-card badge-purple"><span>🏅</span><strong>Primera semana</strong></div>
-              <div className="badge-card badge-green"><span>🔥</span><strong>5 días seguidos</strong></div>
-              <div className="badge-card badge-yellow"><span>🎯</span><strong>10 actividades</strong></div>
+              {badges.map((b, i) => (
+                <div
+                  key={b.label}
+                  className={`badge-card ${['badge-purple', 'badge-green', 'badge-yellow'][i % 3]}`}
+                  style={b.unlocked ? undefined : { opacity: 0.4, filter: 'grayscale(1)' }}
+                >
+                  <span>{b.unlocked ? b.emoji : '🔒'}</span><strong>{b.label}</strong>
+                </div>
+              ))}
             </div>
           </section>
           <section className="notes-section">
