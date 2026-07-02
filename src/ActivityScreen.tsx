@@ -589,6 +589,165 @@ function MovementRoutine({ activity, onClose, onComplete, childAge }: BodyProps)
   );
 }
 
+// Lectura guiada (cuento + comprensión)
+interface Question { q: string; options: string[]; correct: number; }
+interface Story { title: string; emoji: string; text: string[]; questions: Question[]; }
+
+const YOUNG_STORIES: Story[] = [
+  { title: 'El pato que aprendió a nadar', emoji: '🦆', text: [
+    'Lucas era un patito pequeño. Le daba miedo el agua.',
+    'Un día, su mamá lo llevó al lago. Lucas metió una patita, y luego la otra.',
+    '¡Y empezó a nadar! Lucas estaba muy feliz.'
+  ], questions: [
+    { q: '¿Quién es Lucas?', options: ['Un patito', 'Un perro', 'Un pez'], correct: 0 },
+    { q: '¿Qué sentía Lucas al principio?', options: ['Miedo', 'Hambre', 'Sueño'], correct: 0 }
+  ] },
+  { title: 'La semilla valiente', emoji: '🌱', text: [
+    'María plantó una semilla en una maceta.',
+    'Todos los días le daba agua y esperaba con paciencia.',
+    'Una mañana vio algo verde. ¡La semilla se convirtió en una flor! María sonrió.'
+  ], questions: [
+    { q: '¿Qué plantó María?', options: ['Una semilla', 'Una piedra', 'Un juguete'], correct: 0 },
+    { q: '¿En qué se convirtió la semilla?', options: ['En una flor', 'En un pájaro', 'En una fruta'], correct: 0 }
+  ] }
+];
+
+const OLDER_STORIES: Story[] = [
+  { title: 'El puente de la amistad', emoji: '🌉', text: [
+    'Tomás era nuevo en la escuela. En el recreo se sentaba solo, porque todavía no conocía a nadie.',
+    'Un niño llamado Diego lo vio y se acercó. Le ofreció compartir su pelota, y jugaron juntos toda la tarde.',
+    'Desde ese día, Tomás ya no se sintió solo. Aprendió que un pequeño gesto puede empezar una gran amistad.'
+  ], questions: [
+    { q: '¿Por qué Tomás estaba solo?', options: ['Era nuevo y no conocía a nadie', 'No le gustaba jugar', 'Estaba enojado'], correct: 0 },
+    { q: '¿Qué hizo Diego?', options: ['Le ofreció compartir su pelota', 'Se rió de él', 'Se fue corriendo'], correct: 0 },
+    { q: '¿Qué aprendió Tomás?', options: ['Un pequeño gesto puede empezar una amistad', 'Que jugar es aburrido', 'Que es mejor estar solo'], correct: 0 }
+  ] },
+  { title: 'La colina de Sara', emoji: '⛰️', text: [
+    'Sara quería llegar a la cima de una colina. El camino era largo y pronto se cansó.',
+    'Pensó en rendirse, pero respiró hondo y dio un paso más. Luego otro, y otro.',
+    'Poco a poco llegó a la cima y vio un paisaje hermoso. Sara entendió que las cosas difíciles se logran paso a paso.'
+  ], questions: [
+    { q: '¿Qué quería lograr Sara?', options: ['Llegar a la cima de una colina', 'Nadar en un río', 'Ganar una carrera'], correct: 0 },
+    { q: '¿Qué pensó hacer cuando se cansó?', options: ['Rendirse', 'Correr más rápido', 'Gritar'], correct: 0 },
+    { q: '¿Qué entendió al final?', options: ['Las cosas difíciles se logran paso a paso', 'Que subir es imposible', 'Que es mejor no intentar'], correct: 0 }
+  ] }
+];
+
+function pickStory(age?: number): Story {
+  const a = age ?? 7;
+  const pool = a <= 6 ? YOUNG_STORIES : OLDER_STORIES;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function GuidedReading({ activity, onClose, onComplete, childAge }: BodyProps) {
+  const [story] = useState(() => pickStory(childAge));
+  const [phase, setPhase] = useState<'read' | 'quiz' | 'done'>('read');
+  const [qIndex, setQIndex] = useState(0);
+  const [status, setStatus] = useState<'idle' | 'correct' | 'wrong'>('idle');
+  const [correctCount, setCorrectCount] = useState(0);
+
+  const stopSpeech = () => { try { window.speechSynthesis.cancel(); } catch { /* nada */ } };
+  useEffect(() => stopSpeech, []);
+
+  const speak = () => {
+    try {
+      stopSpeech();
+      const u = new SpeechSynthesisUtterance(story.text.join(' '));
+      u.lang = 'es-ES';
+      u.rate = 0.9;
+      window.speechSynthesis.speak(u);
+    } catch { /* nada */ }
+  };
+
+  const close = () => { stopSpeech(); onClose(); };
+
+  const answer = (optIndex: number) => {
+    if (status === 'correct') return;
+    if (optIndex === story.questions[qIndex].correct) {
+      setStatus('correct');
+      setCorrectCount((c) => c + 1);
+    } else {
+      setStatus('wrong');
+    }
+  };
+
+  const nextQuestion = () => {
+    if (qIndex + 1 >= story.questions.length) {
+      setPhase('done');
+    } else {
+      setQIndex((i) => i + 1);
+      setStatus('idle');
+    }
+  };
+
+  if (phase === 'read') {
+    return (
+      <>
+        <div style={{ textAlign: 'center', marginBottom: 10 }}>
+          <div style={{ fontSize: 48 }}>{story.emoji}</div>
+          <h3 style={{ margin: '6px 0 0', color: '#2b2b55' }}>{story.title}</h3>
+        </div>
+        <div style={{ background: '#faf9ff', borderRadius: 16, padding: 18, marginBottom: 14 }}>
+          {story.text.map((p, i) => (
+            <p key={i} style={{ fontSize: 18, lineHeight: 1.9, letterSpacing: '0.3px', color: '#2b2b55', margin: i === 0 ? 0 : '12px 0 0' }}>{p}</p>
+          ))}
+        </div>
+        <button onClick={speak} style={backBtn}>🔊 Escuchar la lectura</button>
+        <button onClick={() => setPhase('quiz')} style={primaryBtn(activity.color)}>Continuar a las preguntas</button>
+        <button onClick={close} style={backBtn}>Volver</button>
+      </>
+    );
+  }
+
+  if (phase === 'done') {
+    const total = story.questions.length;
+    return (
+      <>
+        <div style={{ textAlign: 'center', marginBottom: 12 }}>
+          <div style={{ fontSize: 56 }}>🌟</div>
+          <p style={{ color: '#2e9e5b', fontWeight: 700, fontSize: 18, margin: '8px 0' }}>¡Terminaste la lectura!</p>
+          <p style={{ color: '#6b6b85', lineHeight: 1.5 }}>Respondiste bien {correctCount} de {total}. ¡Buen trabajo leyendo y pensando! 📚</p>
+        </div>
+        <button onClick={() => { onComplete(activity); close(); }} style={completeBtn}>Completar actividad</button>
+        <button onClick={close} style={backBtn}>Volver</button>
+      </>
+    );
+  }
+
+  const question = story.questions[qIndex];
+  return (
+    <>
+      <p style={{ textAlign: 'center', color: '#6b6b85', fontSize: 13, marginBottom: 8 }}>Pregunta {qIndex + 1} de {story.questions.length}</p>
+      <h3 style={{ textAlign: 'center', color: '#2b2b55', margin: '0 0 16px', lineHeight: 1.4 }}>{question.q}</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+        {question.options.map((opt, i) => {
+          const isCorrect = status !== 'idle' && i === question.correct;
+          return (
+            <button key={i} onClick={() => answer(i)} disabled={status === 'correct'} style={{
+              padding: 14, borderRadius: 14,
+              border: isCorrect ? '2px solid #2e9e5b' : '1px solid #dddddd',
+              background: isCorrect ? '#e7f7ee' : '#fff', color: '#2b2b55',
+              fontSize: 15, textAlign: 'left', cursor: status === 'correct' ? 'default' : 'pointer'
+            }}>{opt}</button>
+          );
+        })}
+      </div>
+      {status === 'correct' && (
+        <>
+          <p style={{ textAlign: 'center', color: '#2e9e5b', fontWeight: 700, marginBottom: 10 }}>¡Muy bien! 🎉</p>
+          <button onClick={nextQuestion} style={primaryBtn(activity.color)}>
+            {qIndex + 1 >= story.questions.length ? 'Ver resultado' : 'Siguiente pregunta'}
+          </button>
+        </>
+      )}
+      {status === 'wrong' && (
+        <p style={{ textAlign: 'center', color: '#e08a00', marginBottom: 10 }}>Casi… vuelve a leer e inténtalo de nuevo 💪</p>
+      )}
+      <button onClick={close} style={backBtn}>Volver</button>
+    </>
+  );
+}
+
 // Temporizador genérico
 function TimerExercise({ activity, onClose, onComplete }: BodyProps) {
   const totalSeconds = activity.duration * 60;
@@ -634,6 +793,7 @@ export default function ActivityScreen({ activity, onClose, onComplete, childAge
   const isSensory = activity.title.toLowerCase().includes('sensorial');
   const isEmotions = activity.title.toLowerCase().includes('emociones');
   const isMovement = activity.title.toLowerCase().includes('movimiento');
+  const isReading = activity.title.toLowerCase().includes('lectura');
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(25, 25, 50, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
@@ -654,6 +814,8 @@ export default function ActivityScreen({ activity, onClose, onComplete, childAge
           ? <EmotionDiary activity={activity} onClose={onClose} onComplete={onComplete} childAge={childAge} onEmotionLog={onEmotionLog} />
           : isMovement
           ? <MovementRoutine activity={activity} onClose={onClose} onComplete={onComplete} childAge={childAge} />
+          : isReading
+          ? <GuidedReading activity={activity} onClose={onClose} onComplete={onComplete} childAge={childAge} />
           : <TimerExercise activity={activity} onClose={onClose} onComplete={onComplete} />}
       </div>
     </div>
