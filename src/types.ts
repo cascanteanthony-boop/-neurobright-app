@@ -8,6 +8,22 @@ export type QuestionnaireKey =
 
 export type QuestionnaireAnswers = Record<QuestionnaireKey, number>;
 
+export interface QuestionnaireActivityResult {
+  id: string;
+  label: string;
+  skills: string[];
+  correct: boolean;
+  attempts: number;
+}
+
+export interface QuestionnaireInsights {
+  areaScores: QuestionnaireAnswers;
+  strengths: string[];
+  supportAreas: string[];
+  activityResults: QuestionnaireActivityResult[];
+  completedAt: string;
+}
+
 export interface UserMetadata {
   parentName?: string;
   parentEmail?: string;
@@ -16,4 +32,5 @@ export interface UserMetadata {
   questionnaireCompleted?: boolean;
   questionnaireAnswers?: QuestionnaireAnswers;
   childProfile?: string;
+  questionnaireInsights?: QuestionnaireInsights;
 }
