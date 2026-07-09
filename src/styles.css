@@ -1710,3 +1710,24 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================
+   FIX RESPONSIVE (2) — se aplican en todas las pantallas.
+   Van al final para tener prioridad sobre reglas anteriores.
+   ============================================================ */
+
+/* La barra de navegación es fija abajo: dejamos espacio suficiente
+   al final del panel para que NUNCA tape el último contenido. */
+.dashboard-shell {
+  padding-bottom: 96px;
+}
+
+/* Palabras largas (ej. "capacidades") se parten para no desbordarse
+   de las tarjetas Edad / Perfil / Objetivo ni de las etiquetas. */
+.profile-stats div,
+.profile-stats strong,
+.profile-condition,
+.condition-badge {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
