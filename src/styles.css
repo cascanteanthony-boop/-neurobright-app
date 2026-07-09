@@ -1625,3 +1625,88 @@ button {
     grid-template-columns: 200px 1fr;
   }
 }
+
+/* ============================================================
+   RESPONSIVE — ajustes para móviles y pantallas pequeñas.
+   Añadido al final para no romper el diseño de escritorio.
+   (usa max-width: solo aplica en pantallas chicas)
+   ============================================================ */
+@media (max-width: 600px) {
+  /* Evita que el contenido alto quede cortado por arriba al centrar */
+  .app-shell {
+    padding: 12px;
+    align-items: flex-start;
+  }
+
+  .welcome-screen,
+  .auth-shell,
+  .dashboard-shell {
+    width: 100%;
+  }
+
+  /* Espacio inferior para que la barra de navegación fija
+     NO tape los últimos botones del contenido */
+  .dashboard-shell {
+    padding: 18px 16px 96px;
+  }
+
+  /* Títulos un poco más pequeños para que respiren en el móvil */
+  .dashboard-header h1 {
+    font-size: 1.45rem;
+  }
+  .questionnaire-header h2 {
+    font-size: 1.5rem;
+  }
+  .auth-header h2 {
+    font-size: 1.4rem;
+  }
+
+  /* Tarjetas con menos relleno = más ancho útil */
+  .profile-card,
+  .activity-section,
+  .progress-section {
+    padding: 16px;
+    border-radius: 22px;
+  }
+  .auth-card {
+    padding: 22px 16px;
+  }
+  .welcome-hero {
+    padding: 24px 18px;
+  }
+
+  /* El encabezado del cuestionario se acomoda sin desbordarse */
+  .questionnaire-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  /* Las 3 estadísticas del perfil se apilan en vez de apretarse */
+  .profile-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 380px) {
+  .app-shell {
+    padding: 8px;
+  }
+  .dashboard-header h1 {
+    font-size: 1.3rem;
+  }
+  .questionnaire-header h2 {
+    font-size: 1.35rem;
+  }
+  /* La barra inferior con 5 íconos: texto e íconos más compactos */
+  .nav-item {
+    font-size: 0.66rem;
+    padding: 8px 2px;
+  }
+  .nav-icon {
+    font-size: 1.15rem;
+  }
+  /* Estadísticas del perfil en una sola columna en pantallas muy chicas */
+  .profile-stats {
+    grid-template-columns: 1fr;
+  }
+}

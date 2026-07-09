@@ -777,7 +777,8 @@ export default function Questionnaire({ userMetadata, onComplete }: Questionnair
 
   const childName = userMetadata.childName ?? 'tu peque';
   const step = steps[currentStep];
-  const progress = Math.round(((currentStep + 1) / steps.length) * 100);
+  const progress =
+    steps.length > 1 ? Math.round((currentStep / (steps.length - 1)) * 100) : 0;
 
   const isActivity = (s: Step): s is Extract<Step, { id: string; skills: QuestionnaireKey[] }> =>
     s.type === 'match' ||
@@ -811,6 +812,20 @@ export default function Questionnaire({ userMetadata, onComplete }: Questionnair
     if (currentStep > 0) {
       setCurrentStep((value) => value - 1);
       setErrorMessage('');
+    }
+  };
+
+  const handleExit = async () => {
+    // scope 'local' cierra la sesión en este dispositivo sin esperar al servidor
+    // (evita que se cuelgue si Supabase está lento o en cold start). Al cerrar
+    // sesión, App.tsx detecta el cambio y vuelve a la pantalla de bienvenida.
+    try {
+      await Promise.race([
+        supabase.auth.signOut({ scope: 'local' }),
+        new Promise((resolve) => window.setTimeout(resolve, 3000))
+      ]);
+    } catch (err) {
+      console.error('Error al cerrar sesión', err);
     }
   };
 
@@ -929,7 +944,12 @@ export default function Questionnaire({ userMetadata, onComplete }: Questionnair
               Una guía de apoyo (no un diagnóstico) para personalizar la app según {childName}.
             </p>
           </div>
-          <div className="question-progress-pill">{progress}%</div>
+          <div className="nb-q-header-right">
+            <div className="question-progress-pill">{progress}%</div>
+            <button type="button" className="nb-q-exit" onClick={handleExit} disabled={loading}>
+              🚪 Cerrar sesión
+            </button>
+          </div>
         </div>
 
         <div className="question-progress-track" aria-hidden="true">
@@ -1103,6 +1123,10 @@ export default function Questionnaire({ userMetadata, onComplete }: Questionnair
 // ───────────────────────────────────────────────────────────
 
 const questionnaireStyles = `
+.nb-q-header-right{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.nb-q-exit{display:inline-flex;align-items:center;gap:6px;background:#fff;border:2px solid #fecaca;color:#dc2626;font-size:13px;font-weight:700;cursor:pointer;padding:7px 14px;border-radius:999px;transition:transform .12s ease,border-color .12s ease,background .12s ease,box-shadow .12s ease}
+.nb-q-exit:hover{transform:translateY(-1px);background:#fef2f2;border-color:#f87171;box-shadow:0 4px 12px rgba(220,38,38,.15)}
+.nb-q-exit:disabled{opacity:.5;cursor:default;transform:none;box-shadow:none}
 .nb-q-intro{display:flex;flex-direction:column;gap:12px;align-items:center;text-align:center;padding:6px 4px}
 .nb-q-intro-emoji{font-size:52px}
 .nb-q-intro h3{margin:0}

@@ -8,7 +8,30 @@ interface AuthSectionProps {
   onBack: () => void;
 }
 
-export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: AuthSectionProps) {
+// ───────────────────────────────────────────────────────────
+// Manejo de "cold start" de Supabase (plan gratuito nano).
+// - WARMING_DELAY: a los pocos segundos avisamos que el servidor
+//   puede estar "despertando".
+// - ATTEMPT_TIMEOUT: cuánto espera cada intento antes de rendirse.
+// - MAX_LOGIN_ATTEMPTS: cuántas veces reintenta el login solo.
+// ───────────────────────────────────────────────────────────
+const WARMING_DELAY = 4000;
+const ATTEMPT_TIMEOUT = 18000;
+const MAX_LOGIN_ATTEMPTS = 2;
+
+const TIMEOUT = { __timeout: true } as const;
+type TimeoutResult = typeof TIMEOUT;
+
+// Corre una promesa con un límite de tiempo. Si se pasa del tiempo,
+// devuelve el marcador TIMEOUT en vez de quedarse esperando para siempre.
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | TimeoutResult> {
+  return Promise.race([
+    promise,
+    new Promise<TimeoutResult>((resolve) => window.setTimeout(() => resolve(TIMEOUT), ms))
+  ]);
+}
+
+export default function AuthSection({ mode, onModeChange, onBack }: AuthSectionProps) {
   const [parentName, setParentName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,8 +41,13 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
   const [infoMessage, setInfoMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
-  const overallTimeoutRef = useRef<number | null>(null);
-  const postResponseTimeoutRef = useRef<number | null>(null);
+  const warmingTimerRef = useRef<number | null>(null);
+
+  const showTimeoutMessage = () => {
+    setErrorMessage(
+      'El servidor tardó en responder (puede estar despertando). Esperá unos segundos y volvé a intentar.'
+    );
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -29,91 +57,88 @@ export default function AuthSection({ mode, onModeChange, onSuccess, onBack }: A
 
     console.log('Iniciando login...');
 
-    // Timeout global de 8s que cancela loading y muestra error
-    overallTimeoutRef.current = window.setTimeout(() => {
-      console.error('Login: timeout de 8 segundos');
-      setLoading(false);
-      setErrorMessage('Tiempo agotado, intenta de nuevo');
-    }, 25000);
+    // Tras unos segundos, avisamos que el servidor puede estar despertando.
+    warmingTimerRef.current = window.setTimeout(() => {
+      setInfoMessage('Estamos despertando el servidor… esto puede tardar unos segundos ⏳');
+    }, WARMING_DELAY);
 
     try {
+      // REGISTRO: primero creamos la cuenta (un solo intento).
       if (mode === 'register') {
-        const { error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: window.location.origin,
-            data: {
-              parentName,
-              childName,
-              childAge: childAge ? Number(childAge) : null
+        const signUpRes = await withTimeout(
+          supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: window.location.origin,
+              data: {
+                parentName,
+                childName,
+                childAge: childAge ? Number(childAge) : null
+              }
             }
-          }
-        });
+          }),
+          ATTEMPT_TIMEOUT
+        );
 
-        console.log('Respuesta de Supabase recibida (signUp)', signUpError ?? null);
-
-        if (signUpError) {
-          clearTimeout(overallTimeoutRef.current ?? undefined);
-          console.error(signUpError);
-          setLoading(false);
-          setErrorMessage(signUpError.message);
+        if ('__timeout' in signUpRes) {
+          showTimeoutMessage();
           return;
         }
-
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-        console.log('Respuesta de Supabase recibida (signIn)', data ?? signInError ?? null);
-
-        clearTimeout(overallTimeoutRef.current ?? undefined);
-
-        if (signInError) {
-          console.error(signInError);
-          setErrorMessage(signInError.message);
-          postResponseTimeoutRef.current = window.setTimeout(() => setLoading(false), 3000);
+        if (signUpRes.error) {
+          console.error(signUpRes.error);
+          setErrorMessage(signUpRes.error.message);
           return;
         }
-
-        if (data && (data as any).user) {
-          console.log('Usuario autenticado', (data as any).user);
-          window.location.href = '/';
-          return;
-        }
-
-        postResponseTimeoutRef.current = window.setTimeout(() => setLoading(false), 3000);
-        return;
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      console.log('Respuesta de Supabase recibida', data ?? error ?? null);
-
-      clearTimeout(overallTimeoutRef.current ?? undefined);
-
-      if (error) {
-        console.error(error);
-        setErrorMessage(error.message);
-        postResponseTimeoutRef.current = window.setTimeout(() => setLoading(false), 3000);
-        return;
+      // LOGIN (también tras el registro): con reintento automático.
+      let signInRes: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>> | null = null;
+      for (let attempt = 1; attempt <= MAX_LOGIN_ATTEMPTS; attempt += 1) {
+        if (attempt > 1) {
+          setInfoMessage('El servidor está tardando, reintentando…');
+        }
+        const res = await withTimeout(
+          supabase.auth.signInWithPassword({ email, password }),
+          ATTEMPT_TIMEOUT
+        );
+        if (!('__timeout' in res)) {
+          signInRes = res;
+          break;
+        }
       }
 
-      if (data && (data as any).user) {
-        console.log('Usuario autenticado', (data as any).user);
+      if (!signInRes) {
+        showTimeoutMessage();
+        return;
+      }
+      if (signInRes.error) {
+        console.error(signInRes.error);
+        setErrorMessage(signInRes.error.message);
+        return;
+      }
+      if (signInRes.data.user) {
+        console.log('Usuario autenticado');
         window.location.href = '/';
         return;
       }
 
-      postResponseTimeoutRef.current = window.setTimeout(() => setLoading(false), 3000);
+      setErrorMessage('No se pudo iniciar sesión. Intentá de nuevo.');
     } catch (err) {
       console.error('Error inesperado en login', err);
-      clearTimeout(overallTimeoutRef.current ?? undefined);
-      setErrorMessage('Ocurrió un error inesperado');
-      postResponseTimeoutRef.current = window.setTimeout(() => setLoading(false), 3000);
+      setErrorMessage('Ocurrió un error inesperado. Intentá de nuevo.');
+    } finally {
+      if (warmingTimerRef.current) {
+        clearTimeout(warmingTimerRef.current);
+        warmingTimerRef.current = null;
+      }
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     return () => {
-      if (overallTimeoutRef.current) clearTimeout(overallTimeoutRef.current);
-      if (postResponseTimeoutRef.current) clearTimeout(postResponseTimeoutRef.current);
+      if (warmingTimerRef.current) clearTimeout(warmingTimerRef.current);
     };
   }, []);
 

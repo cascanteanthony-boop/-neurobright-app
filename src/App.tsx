@@ -6,6 +6,7 @@ import AuthSection from './AuthSection';
 import NavShell from './NavShell';
 import Questionnaire from './Questionnaire';
 import ResetPassword from './ResetPassword';
+import { LanguageProvider } from './lib/i18n';
 import type { UserMetadata } from './types';
 
 export type AppView = 'welcome' | 'auth' | 'questionnaire' | 'home' | 'resetPassword';
@@ -148,8 +149,9 @@ function App() {
   };
 
   return (
-    <div className="app-shell">
-      {view === 'welcome' && (
+    <LanguageProvider>
+      <div className="app-shell">
+        {view === 'welcome' && (
         <WelcomeScreen
           onRegister={() => {
             setAuthMode('register');
@@ -177,7 +179,8 @@ function App() {
 
       {view === 'resetPassword' && <ResetPassword />}
       {view === 'home' && <NavShell userMetadata={userMetadata} onSignOut={handleSignOut} />}
-    </div>
+      </div>
+    </LanguageProvider>
   );
 }
 
