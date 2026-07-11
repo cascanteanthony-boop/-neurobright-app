@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from './lib/i18n';
 
 export interface ActivityInfo {
+  id: string;
   icon: string;
   title: string;
   duration: number;
@@ -660,55 +661,135 @@ function MovementRoutine({ activity, onClose, onComplete, childAge }: BodyProps)
 interface Question { q: string; options: string[]; correct: number; }
 interface Story { title: string; emoji: string; text: string[]; questions: Question[]; }
 
-const YOUNG_STORIES: Story[] = [
-  { title: 'El pato que aprendió a nadar', emoji: '🦆', text: [
-    'Lucas era un patito pequeño. Le daba miedo el agua.',
-    'Un día, su mamá lo llevó al lago. Lucas metió una patita, y luego la otra.',
-    '¡Y empezó a nadar! Lucas estaba muy feliz.'
-  ], questions: [
-    { q: '¿Quién es Lucas?', options: ['Un patito', 'Un perro', 'Un pez'], correct: 0 },
-    { q: '¿Qué sentía Lucas al principio?', options: ['Miedo', 'Hambre', 'Sueño'], correct: 0 }
-  ] },
-  { title: 'La semilla valiente', emoji: '🌱', text: [
-    'María plantó una semilla en una maceta.',
-    'Todos los días le daba agua y esperaba con paciencia.',
-    'Una mañana vio algo verde. ¡La semilla se convirtió en una flor! María sonrió.'
-  ], questions: [
-    { q: '¿Qué plantó María?', options: ['Una semilla', 'Una piedra', 'Un juguete'], correct: 0 },
-    { q: '¿En qué se convirtió la semilla?', options: ['En una flor', 'En un pájaro', 'En una fruta'], correct: 0 }
-  ] }
-];
+const STORIES_YOUNG: Record<string, Story[]> = {
+  es: [
+    { title: 'El pato que aprendió a nadar', emoji: '🦆', text: [
+      'Lucas era un patito pequeño. Le daba miedo el agua.',
+      'Un día, su mamá lo llevó al lago. Lucas metió una patita, y luego la otra.',
+      '¡Y empezó a nadar! Lucas estaba muy feliz.'
+    ], questions: [
+      { q: '¿Quién es Lucas?', options: ['Un patito', 'Un perro', 'Un pez'], correct: 0 },
+      { q: '¿Qué sentía Lucas al principio?', options: ['Miedo', 'Hambre', 'Sueño'], correct: 0 }
+    ] },
+    { title: 'La semilla valiente', emoji: '🌱', text: [
+      'María plantó una semilla en una maceta.',
+      'Todos los días le daba agua y esperaba con paciencia.',
+      'Una mañana vio algo verde. ¡La semilla se convirtió en una flor! María sonrió.'
+    ], questions: [
+      { q: '¿Qué plantó María?', options: ['Una semilla', 'Una piedra', 'Un juguete'], correct: 0 },
+      { q: '¿En qué se convirtió la semilla?', options: ['En una flor', 'En un pájaro', 'En una fruta'], correct: 0 }
+    ] }
+  ],
+  en: [
+    { title: 'The duck who learned to swim', emoji: '🦆', text: [
+      'Lucas was a little duckling. He was afraid of the water.',
+      'One day, his mom took him to the lake. Lucas put in one little foot, and then the other.',
+      'And he started to swim! Lucas was very happy.'
+    ], questions: [
+      { q: 'Who is Lucas?', options: ['A duckling', 'A dog', 'A fish'], correct: 0 },
+      { q: 'What did Lucas feel at first?', options: ['Fear', 'Hunger', 'Sleepiness'], correct: 0 }
+    ] },
+    { title: 'The brave seed', emoji: '🌱', text: [
+      'Maria planted a seed in a pot.',
+      'Every day she gave it water and waited patiently.',
+      'One morning she saw something green. The seed became a flower! Maria smiled.'
+    ], questions: [
+      { q: 'What did Maria plant?', options: ['A seed', 'A stone', 'A toy'], correct: 0 },
+      { q: 'What did the seed become?', options: ['A flower', 'A bird', 'A fruit'], correct: 0 }
+    ] }
+  ],
+  pt: [
+    { title: 'O patinho que aprendeu a nadar', emoji: '🦆', text: [
+      'Lucas era um patinho pequeno. Ele tinha medo da água.',
+      'Um dia, sua mãe o levou ao lago. Lucas colocou uma patinha, e depois a outra.',
+      'E começou a nadar! Lucas ficou muito feliz.'
+    ], questions: [
+      { q: 'Quem é o Lucas?', options: ['Um patinho', 'Um cachorro', 'Um peixe'], correct: 0 },
+      { q: 'O que o Lucas sentia no começo?', options: ['Medo', 'Fome', 'Sono'], correct: 0 }
+    ] },
+    { title: 'A semente corajosa', emoji: '🌱', text: [
+      'Maria plantou uma semente em um vaso.',
+      'Todos os dias dava água e esperava com paciência.',
+      'Uma manhã viu algo verde. A semente virou uma flor! Maria sorriu.'
+    ], questions: [
+      { q: 'O que a Maria plantou?', options: ['Uma semente', 'Uma pedra', 'Um brinquedo'], correct: 0 },
+      { q: 'No que a semente se transformou?', options: ['Em uma flor', 'Em um pássaro', 'Em uma fruta'], correct: 0 }
+    ] }
+  ]
+};
 
-const OLDER_STORIES: Story[] = [
-  { title: 'El puente de la amistad', emoji: '🌉', text: [
-    'Tomás era nuevo en la escuela. En el recreo se sentaba solo, porque todavía no conocía a nadie.',
-    'Un niño llamado Diego lo vio y se acercó. Le ofreció compartir su pelota, y jugaron juntos toda la tarde.',
-    'Desde ese día, Tomás ya no se sintió solo. Aprendió que un pequeño gesto puede empezar una gran amistad.'
-  ], questions: [
-    { q: '¿Por qué Tomás estaba solo?', options: ['Era nuevo y no conocía a nadie', 'No le gustaba jugar', 'Estaba enojado'], correct: 0 },
-    { q: '¿Qué hizo Diego?', options: ['Le ofreció compartir su pelota', 'Se rió de él', 'Se fue corriendo'], correct: 0 },
-    { q: '¿Qué aprendió Tomás?', options: ['Un pequeño gesto puede empezar una amistad', 'Que jugar es aburrido', 'Que es mejor estar solo'], correct: 0 }
-  ] },
-  { title: 'La colina de Sara', emoji: '⛰️', text: [
-    'Sara quería llegar a la cima de una colina. El camino era largo y pronto se cansó.',
-    'Pensó en rendirse, pero respiró hondo y dio un paso más. Luego otro, y otro.',
-    'Poco a poco llegó a la cima y vio un paisaje hermoso. Sara entendió que las cosas difíciles se logran paso a paso.'
-  ], questions: [
-    { q: '¿Qué quería lograr Sara?', options: ['Llegar a la cima de una colina', 'Nadar en un río', 'Ganar una carrera'], correct: 0 },
-    { q: '¿Qué pensó hacer cuando se cansó?', options: ['Rendirse', 'Correr más rápido', 'Gritar'], correct: 0 },
-    { q: '¿Qué entendió al final?', options: ['Las cosas difíciles se logran paso a paso', 'Que subir es imposible', 'Que es mejor no intentar'], correct: 0 }
-  ] }
-];
+const STORIES_OLDER: Record<string, Story[]> = {
+  es: [
+    { title: 'El puente de la amistad', emoji: '🌉', text: [
+      'Tomás era nuevo en la escuela. En el recreo se sentaba solo, porque todavía no conocía a nadie.',
+      'Un niño llamado Diego lo vio y se acercó. Le ofreció compartir su pelota, y jugaron juntos toda la tarde.',
+      'Desde ese día, Tomás ya no se sintió solo. Aprendió que un pequeño gesto puede empezar una gran amistad.'
+    ], questions: [
+      { q: '¿Por qué Tomás estaba solo?', options: ['Era nuevo y no conocía a nadie', 'No le gustaba jugar', 'Estaba enojado'], correct: 0 },
+      { q: '¿Qué hizo Diego?', options: ['Le ofreció compartir su pelota', 'Se rió de él', 'Se fue corriendo'], correct: 0 },
+      { q: '¿Qué aprendió Tomás?', options: ['Un pequeño gesto puede empezar una amistad', 'Que jugar es aburrido', 'Que es mejor estar solo'], correct: 0 }
+    ] },
+    { title: 'La colina de Sara', emoji: '⛰️', text: [
+      'Sara quería llegar a la cima de una colina. El camino era largo y pronto se cansó.',
+      'Pensó en rendirse, pero respiró hondo y dio un paso más. Luego otro, y otro.',
+      'Poco a poco llegó a la cima y vio un paisaje hermoso. Sara entendió que las cosas difíciles se logran paso a paso.'
+    ], questions: [
+      { q: '¿Qué quería lograr Sara?', options: ['Llegar a la cima de una colina', 'Nadar en un río', 'Ganar una carrera'], correct: 0 },
+      { q: '¿Qué pensó hacer cuando se cansó?', options: ['Rendirse', 'Correr más rápido', 'Gritar'], correct: 0 },
+      { q: '¿Qué entendió al final?', options: ['Las cosas difíciles se logran paso a paso', 'Que subir es imposible', 'Que es mejor no intentar'], correct: 0 }
+    ] }
+  ],
+  en: [
+    { title: 'The friendship bridge', emoji: '🌉', text: [
+      'Tomas was new at school. At recess he sat alone, because he did not know anyone yet.',
+      'A boy named Diego saw him and came over. He offered to share his ball, and they played together all afternoon.',
+      'From that day on, Tomas no longer felt alone. He learned that a small gesture can begin a great friendship.'
+    ], questions: [
+      { q: 'Why was Tomas alone?', options: ['He was new and did not know anyone', 'He did not like to play', 'He was angry'], correct: 0 },
+      { q: 'What did Diego do?', options: ['He offered to share his ball', 'He laughed at him', 'He ran away'], correct: 0 },
+      { q: 'What did Tomas learn?', options: ['A small gesture can begin a friendship', 'That playing is boring', 'That it is better to be alone'], correct: 0 }
+    ] },
+    { title: 'Sara and the hill', emoji: '⛰️', text: [
+      'Sara wanted to reach the top of a hill. The path was long and she soon got tired.',
+      'She thought about giving up, but she took a deep breath and took one more step. Then another, and another.',
+      'Little by little she reached the top and saw a beautiful view. Sara understood that hard things are achieved step by step.'
+    ], questions: [
+      { q: 'What did Sara want to achieve?', options: ['To reach the top of a hill', 'To swim in a river', 'To win a race'], correct: 0 },
+      { q: 'What did she think of doing when she got tired?', options: ['Giving up', 'Running faster', 'Shouting'], correct: 0 },
+      { q: 'What did she understand at the end?', options: ['Hard things are achieved step by step', 'That climbing is impossible', 'That it is better not to try'], correct: 0 }
+    ] }
+  ],
+  pt: [
+    { title: 'A ponte da amizade', emoji: '🌉', text: [
+      'Tomás era novo na escola. No recreio sentava sozinho, porque ainda não conhecia ninguém.',
+      'Um menino chamado Diego o viu e se aproximou. Ofereceu compartilhar sua bola, e brincaram juntos a tarde toda.',
+      'A partir daquele dia, Tomás não se sentiu mais sozinho. Aprendeu que um pequeno gesto pode começar uma grande amizade.'
+    ], questions: [
+      { q: 'Por que o Tomás estava sozinho?', options: ['Era novo e não conhecia ninguém', 'Não gostava de brincar', 'Estava bravo'], correct: 0 },
+      { q: 'O que o Diego fez?', options: ['Ofereceu compartilhar sua bola', 'Riu dele', 'Saiu correndo'], correct: 0 },
+      { q: 'O que o Tomás aprendeu?', options: ['Um pequeno gesto pode começar uma amizade', 'Que brincar é chato', 'Que é melhor ficar sozinho'], correct: 0 }
+    ] },
+    { title: 'A colina da Sara', emoji: '⛰️', text: [
+      'Sara queria chegar ao topo de uma colina. O caminho era longo e logo ela se cansou.',
+      'Pensou em desistir, mas respirou fundo e deu mais um passo. Depois outro, e outro.',
+      'Aos poucos chegou ao topo e viu uma paisagem linda. Sara entendeu que as coisas difíceis se conquistam passo a passo.'
+    ], questions: [
+      { q: 'O que a Sara queria alcançar?', options: ['Chegar ao topo de uma colina', 'Nadar em um rio', 'Ganhar uma corrida'], correct: 0 },
+      { q: 'O que ela pensou em fazer quando se cansou?', options: ['Desistir', 'Correr mais rápido', 'Gritar'], correct: 0 },
+      { q: 'O que ela entendeu no final?', options: ['As coisas difíceis se conquistam passo a passo', 'Que subir é impossível', 'Que é melhor não tentar'], correct: 0 }
+    ] }
+  ]
+};
 
-function pickStory(age?: number): Story {
+function pickStory(age: number | undefined, lang: string): Story {
   const a = age ?? 7;
-  const pool = a <= 6 ? YOUNG_STORIES : OLDER_STORIES;
+  const table = a <= 6 ? STORIES_YOUNG : STORIES_OLDER;
+  const pool = table[lang] ?? table.es;
   return pool[Math.floor(Math.random() * pool.length)];
 }
-
 function GuidedReading({ activity, onClose, onComplete, childAge }: BodyProps) {
-  const { t } = useTranslation();
-  const [story] = useState(() => pickStory(childAge));
+  const { t, lang } = useTranslation();
+  const [story] = useState(() => pickStory(childAge, lang));
   const [phase, setPhase] = useState<'read' | 'quiz' | 'done'>('read');
   const [qIndex, setQIndex] = useState(0);
   const [status, setStatus] = useState<'idle' | 'correct' | 'wrong'>('idle');
@@ -721,7 +802,7 @@ function GuidedReading({ activity, onClose, onComplete, childAge }: BodyProps) {
     try {
       stopSpeech();
       const u = new SpeechSynthesisUtterance(story.text.join(' '));
-      u.lang = 'es-ES';
+      u.lang = ({ es: 'es-ES', en: 'en-US', pt: 'pt-BR' } as Record<string, string>)[lang] ?? 'es-ES';
       u.rate = 0.9;
       window.speechSynthesis.speak(u);
     } catch { /* nada */ }
@@ -871,8 +952,8 @@ export default function ActivityScreen({ activity, onClose, onComplete, childAge
         <div style={{ textAlign: 'center', marginBottom: 12 }}>
           <div style={{ width: 72, height: 72, borderRadius: 20, margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 34, background: `${activity.color}22` }}>{activity.icon}</div>
           <span style={{ display: 'inline-block', background: activity.color, color: '#fff', fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 999, marginBottom: 10 }}>{t(`cat.${activity.category}`)}</span>
-          <h2 style={{ margin: '4px 0 8px', color: '#2b2b55' }}>{activity.title}</h2>
-          <p style={{ color: '#6b6b85', margin: 0, lineHeight: 1.5 }}>{activity.description}</p>
+          <h2 style={{ margin: '4px 0 8px', color: '#2b2b55' }}>{t(`act.title.${activity.id}`)}</h2>
+          <p style={{ color: '#6b6b85', margin: 0, lineHeight: 1.5 }}>{t(`act.desc.${activity.id}`)}</p>
         </div>
         {isBreathing
           ? <BreathingExercise activity={activity} onClose={onClose} onComplete={onComplete} />

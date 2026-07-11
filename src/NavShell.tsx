@@ -16,13 +16,13 @@ type Category = 'Todas' | 'Atención' | 'Calma' | 'Sensorial' | 'Emociones' | 'A
 const categories: Category[] = ['Todas', 'Atención', 'Calma', 'Sensorial', 'Emociones', 'Aprendizaje'];
 
 const activitiesData = [
-  { icon: '🌬️', title: 'Respiración 4-7-8', duration: 5, difficulty: 2, category: 'Calma', color: '#4ECDC4', description: 'Guía de respiración para relajar y centrar.' },
-  { icon: '🧠', title: 'Juego de memoria', duration: 12, difficulty: 3, category: 'Atención', color: '#6C63FF', description: 'Ejercicio divertido para fortalecer la concentración.' },
-  { icon: '🧩', title: 'Rompecabezas sensorial', duration: 15, difficulty: 3, category: 'Sensorial', color: '#FFD166', description: 'Actividad táctil para estimular los sentidos.' },
-  { icon: '📝', title: 'Diario de emociones', duration: 10, difficulty: 2, category: 'Emociones', color: '#FF8DAA', description: 'Registra sensaciones y reflexiona con calma.' },
-  { icon: '📚', title: 'Lectura guiada', duration: 14, difficulty: 2, category: 'Aprendizaje', color: '#6C63FF', description: 'Tiempo de lectura con preguntas de comprensión.' },
-  { icon: '🤸', title: 'Tiempo de movimiento', duration: 8, difficulty: 1, category: 'Calma', color: '#4ECDC4', description: 'Pequeños ejercicios para descargar energía positiva.' }
-];
+  { id: 'breathing', icon: '🌬️', title: 'Respiración 4-7-8', duration: 5, difficulty: 2, category: 'Calma', color: '#4ECDC4', description: 'Guía de respiración para relajar y centrar.' },
+  { id: 'memory', icon: '🧠', title: 'Juego de memoria', duration: 12, difficulty: 3, category: 'Atención', color: '#6C63FF', description: 'Ejercicio divertido para fortalecer la concentración.' },
+  { id: 'sensory', icon: '🧩', title: 'Rompecabezas sensorial', duration: 15, difficulty: 3, category: 'Sensorial', color: '#FFD166', description: 'Actividad táctil para estimular los sentidos.' },
+  { id: 'emotions', icon: '📝', title: 'Diario de emociones', duration: 10, difficulty: 2, category: 'Emociones', color: '#FF8DAA', description: 'Registra sensaciones y reflexiona con calma.' },
+  { id: 'reading', icon: '📚', title: 'Lectura guiada', duration: 14, difficulty: 2, category: 'Aprendizaje', color: '#6C63FF', description: 'Tiempo de lectura con preguntas de comprensión.' },
+  { id: 'movement', icon: '🤸', title: 'Tiempo de movimiento', duration: 8, difficulty: 1, category: 'Calma', color: '#4ECDC4', description: 'Pequeños ejercicios para descargar energía positiva.' }
+]
 
 const tabLabels: Record<Tab, string> = {
   inicio: 'Inicio',
@@ -235,14 +235,14 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
           </div>
           <div className="activities-grid">
             {filteredActivities.map((activity) => (
-              <article key={activity.title} className="activity-card">
+              <article key={activity.id} className="activity-card">
                 <div className="activity-card-icon" style={{ backgroundColor: `${activity.color}22`, color: activity.color }}>{activity.icon}</div>
                 <div className="activity-card-body">
                   <div className="activity-card-header">
-                    <h2>{activity.title}</h2>
+                    <h2>{t(`act.title.${activity.id}`)}</h2>
                     <span className="activity-category" style={{ backgroundColor: activity.color }}>{t(`cat.${activity.category}`)}</span>
                   </div>
-                  <p>{activity.description}</p>
+                  <p>{t(`act.desc.${activity.id}`)}</p>
                   <div className="activity-card-meta">
                     <span>{activity.duration} min</span>
                     <span className="difficulty-stars">
@@ -406,9 +406,9 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
                 <p style={{ color: '#6b6b85' }}>{t('home.allDone')}</p>
               ) : (
                 recommended.map((activity) => (
-                  <button key={activity.title} className="activity-item" onClick={() => setActiveActivity(activity)} style={{ width: '100%', textAlign: 'left', border: 'none', background: 'transparent', cursor: 'pointer' }}>
+                  <button key={activity.id} className="activity-item" onClick={() => setActiveActivity(activity)} style={{ width: '100%', textAlign: 'left', border: 'none', background: 'transparent', cursor: 'pointer' }}>
                     <div className="activity-icon">{activity.icon}</div>
-                    <div><strong>{activity.title}</strong><p>{activity.description}</p></div>
+                    <div><strong>{t(`act.title.${activity.id}`)}</strong><p>{t(`act.desc.${activity.id}`)}</p></div>
                   </button>
                 ))
               )}
