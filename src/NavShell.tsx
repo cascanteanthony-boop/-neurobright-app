@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { UserMetadata } from './types';
 import ActivityScreen, { type ActivityInfo } from './ActivityScreen';
 import { supabase } from './lib/supabase';
+import { useTranslation, LanguageSwitcher } from './lib/i18n';
 
 type Tab = 'inicio' | 'perfil' | 'actividades' | 'progreso' | 'cuenta';
 
@@ -63,6 +64,8 @@ function priorityCategory(profile: string): string | null {
 
 export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
   const [activeTab, setActiveTab] = useState<Tab>('inicio');
+  const { t, lang } = useTranslation();
+  const [showLangPanel, setShowLangPanel] = useState(false);
   const [activeActivity, setActiveActivity] = useState<ActivityInfo | null>(null);
   const [activityFilter, setActivityFilter] = useState<Category>('Todas');
   const [completions, setCompletions] = useState<Completion[]>(
@@ -102,26 +105,27 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
   const childAge = userMetadata.childAge ?? undefined;
   const childProfile = userMetadata.childProfile ?? 'Perfil en evaluación';
   const today = new Date();
-  const formattedDate = today.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+  const localeMap: Record<string, string> = { es: 'es-ES', en: 'en-US', pt: 'pt-BR' };
+  const formattedDate = today.toLocaleDateString(localeMap[lang] ?? 'es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
   const profileAnswers = (userMetadata.questionnaireAnswers ?? {}) as Record<string, number>;
   const profileAreaValues = [
-    { label: 'Atención', value: (profileAnswers.attention ?? 0) * 20 },
-    { label: 'Comportamiento', value: (profileAnswers.behavior ?? 0) * 20 },
-    { label: 'Comunicación', value: (profileAnswers.communication ?? 0) * 20 },
-    { label: 'Sensorial', value: (profileAnswers.sensory ?? 0) * 20 },
-    { label: 'Emociones', value: (profileAnswers.emotions ?? 0) * 20 },
-    { label: 'Aprendizaje', value: (profileAnswers.learning ?? 0) * 20 }
+    { label: t('area.attention'), value: (profileAnswers.attention ?? 0) * 20 },
+    { label: t('area.behavior'), value: (profileAnswers.behavior ?? 0) * 20 },
+    { label: t('area.communication'), value: (profileAnswers.communication ?? 0) * 20 },
+    { label: t('area.sensory'), value: (profileAnswers.sensory ?? 0) * 20 },
+    { label: t('area.emotions'), value: (profileAnswers.emotions ?? 0) * 20 },
+    { label: t('area.learning'), value: (profileAnswers.learning ?? 0) * 20 }
   ];
 
-  const strengths = ['Observación consciente', 'Curiosidad natural', 'Pensamiento creativo'];
-  const supportAreas = ['Rutinas claras', 'Pausas sensoriales', 'Apoyo emocional'];
+  const strengths = [t('profile.strength1'), t('profile.strength2'), t('profile.strength3')];
+  const supportAreas = [t('profile.support1'), t('profile.support2'), t('profile.support3')];
 
   const dashboardObjective = childProfile.includes('Atención')
-    ? 'Mejorar foco y organización'
+    ? t('objective.focus')
     : childProfile.includes('Emociones')
-    ? 'Apoyar la regulación emocional'
-    : 'Potenciar sus habilidades únicas';
+    ? t('objective.emotion')
+    : t('objective.unique');
 
   const filteredActivities =
     activityFilter === 'Todas' ? activitiesData : activitiesData.filter((activity) => activity.category === activityFilter);
@@ -172,24 +176,24 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
   }).length;
   let improvementLabel: string;
   if (prevTotal === 0) {
-    improvementLabel = totalActivities > 0 ? '¡primera semana activa!' : 'sin datos aún';
+    improvementLabel = totalActivities > 0 ? t('improve.first') : t('improve.none');
   } else {
     const pct = Math.round(((totalActivities - prevTotal) / prevTotal) * 100);
-    improvementLabel = `${pct >= 0 ? '+' : ''}${pct}% vs semana anterior`;
+    improvementLabel = `${pct >= 0 ? '+' : ''}${pct}% ${t('improve.vsPrev')}`;
   }
 
   const streak = computeStreak(completions.map((c) => c.date));
-  const weekLabel = weekOffset === 0 ? 'Semana actual' : `Hace ${weekOffset} semana${weekOffset > 1 ? 's' : ''}`;
+  const weekLabel = weekOffset === 0 ? t('week.current') : t('week.previous', { n: weekOffset });
 
   const totalAllTime = completions.length;
   const weekMetGoalEver = Object.values(weekCounts).some((count) => count >= weeklyGoal);
   const badges = [
-    { emoji: '🌱', label: 'Primeros pasos', unlocked: totalAllTime >= 1 },
-    { emoji: '🔥', label: '3 días seguidos', unlocked: streak >= 3 },
-    { emoji: '⭐', label: '5 días seguidos', unlocked: streak >= 5 },
-    { emoji: '🎯', label: '10 actividades', unlocked: totalAllTime >= 10 },
-    { emoji: '🏅', label: 'Semana completa', unlocked: weekMetGoalEver },
-    { emoji: '🏆', label: '25 actividades', unlocked: totalAllTime >= 25 }
+    { emoji: '🌱', label: t('badge.first'), unlocked: totalAllTime >= 1 },
+    { emoji: '🔥', label: t('badge.streak3'), unlocked: streak >= 3 },
+    { emoji: '⭐', label: t('badge.streak5'), unlocked: streak >= 5 },
+    { emoji: '🎯', label: t('badge.act10'), unlocked: totalAllTime >= 10 },
+    { emoji: '🏅', label: t('badge.weekComplete'), unlocked: weekMetGoalEver },
+    { emoji: '🏆', label: t('badge.act25'), unlocked: totalAllTime >= 25 }
   ];
 
   const todayStr = new Date().toDateString();
@@ -210,14 +214,14 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
     <div className="dashboard-shell">
       <div className="dashboard-header">
         <div>
-          <p className="dashboard-greeting">Hola, aquí el resumen de {childName}</p>
+          <p className="dashboard-greeting">{t('home.greeting', { name: childName })}</p>
           <h1>
-            {activeTab === 'actividades' ? 'Actividades de hoy' : activeTab === 'progreso' ? `Progreso de ${childName}` : 'Un día lleno de apoyo y pequeños logros'}
+            {activeTab === 'actividades' ? t('home.todayActivities') : activeTab === 'progreso' ? t('home.progressOf', { name: childName }) : t('home.heroTitle')}
           </h1>
           {activeTab === 'actividades' && <p className="page-date">{formattedDate}</p>}
           {activeTab === 'progreso' && <p className="page-date">{weekLabel}</p>}
         </div>
-        <button className="secondary-button signout-button" onClick={onSignOut}>Cerrar sesión</button>
+        <button className="secondary-button signout-button" onClick={onSignOut}>{t('common.signOut')}</button>
       </div>
 
       {activeTab === 'actividades' ? (
@@ -225,7 +229,7 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
           <div className="chip-row" role="tablist" aria-label="Filtros de actividad">
             {categories.map((category) => (
               <button key={category} type="button" className={activityFilter === category ? 'chip chip-selected' : 'chip'} onClick={() => setActivityFilter(category)}>
-                {category}
+                {t(`cat.${category}`)}
               </button>
             ))}
           </div>
@@ -236,7 +240,7 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
                 <div className="activity-card-body">
                   <div className="activity-card-header">
                     <h2>{activity.title}</h2>
-                    <span className="activity-category" style={{ backgroundColor: activity.color }}>{activity.category}</span>
+                    <span className="activity-category" style={{ backgroundColor: activity.color }}>{t(`cat.${activity.category}`)}</span>
                   </div>
                   <p>{activity.description}</p>
                   <div className="activity-card-meta">
@@ -248,7 +252,7 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
                     </span>
                   </div>
                 </div>
-                <button className="start-button" onClick={() => setActiveActivity(activity)}>Iniciar</button>
+                <button className="start-button" onClick={() => setActiveActivity(activity)}>{t('activities.start')}</button>
               </article>
             ))}
           </div>
@@ -258,13 +262,13 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
           <div className="week-selector-row">
             <button type="button" className="week-button" onClick={() => setWeekOffset((offset) => offset + 1)}>‹</button>
             <div>
-              <p className="eyebrow">Semana</p>
+              <p className="eyebrow">{t('progress.week')}</p>
               <strong>{weekLabel}</strong>
             </div>
             <button type="button" className="week-button" onClick={() => setWeekOffset((offset) => Math.max(0, offset - 1))} disabled={weekOffset === 0}>›</button>
           </div>
           <section className="bar-chart-card">
-            <div className="section-header"><div><p className="eyebrow">Gráfica semanal</p><h2>Actividades completadas</h2></div></div>
+            <div className="section-header"><div><p className="eyebrow">{t('progress.weeklyChart')}</p><h2>{t('progress.completedActivities')}</h2></div></div>
             <div className="bar-chart">
               {weeklyProgress.map((value, index) => (
                 <div key={index} className="bar-column">
@@ -276,12 +280,12 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
             </div>
           </section>
           <section className="summary-grid">
-            <article className="summary-card"><p className="summary-label">Total esta semana</p><strong>{totalActivities} actividades</strong></article>
-            <article className="summary-card"><p className="summary-label">Racha</p><strong>🔥 {streak} día{streak === 1 ? '' : 's'} seguidos</strong></article>
-            <article className="summary-card"><p className="summary-label">Mejora</p><strong>{improvementLabel}</strong></article>
+            <article className="summary-card"><p className="summary-label">{t('progress.totalWeek')}</p><strong>{totalActivities} {t('progress.activities')}</strong></article>
+            <article className="summary-card"><p className="summary-label">{t('progress.streak')}</p><strong>🔥 {streak} {t('progress.daysStreak')}</strong></article>
+            <article className="summary-card"><p className="summary-label">{t('progress.improvement')}</p><strong>{improvementLabel}</strong></article>
           </section>
           <section className="badges-section">
-            <div className="section-header"><div><p className="eyebrow">Logros desbloqueados</p><h2>Medallas de la semana</h2></div></div>
+            <div className="section-header"><div><p className="eyebrow">{t('progress.achievements')}</p><h2>{t('progress.medals')}</h2></div></div>
             <div className="badge-grid">
               {badges.map((b, i) => (
                 <div
@@ -295,8 +299,8 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
             </div>
           </section>
           <section className="notes-section">
-            <div className="section-header"><div><p className="eyebrow">Notas de la semana</p><h2>Observaciones para la familia</h2></div></div>
-            <textarea className="notes-field" placeholder="Escribe aquí cómo fue la semana, qué funcionó mejor o qué quieres recordar..." />
+            <div className="section-header"><div><p className="eyebrow">{t('progress.notes')}</p><h2>{t('progress.observations')}</h2></div></div>
+            <textarea className="notes-field" placeholder={t('progress.notesPlaceholder')} />
           </section>
         </section>
       ) : activeTab === 'perfil' ? (
@@ -305,12 +309,12 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
             <div className="profile-avatar">{childInitial}</div>
             <div>
               <h2>{childName}</h2>
-              <p className="profile-meta">{childAge ? `${childAge} años` : 'Edad no registrada'}</p>
+              <p className="profile-meta">{childAge ? `${childAge} ${t('common.years')}` : t('profile.ageUnknown')}</p>
               <span className="condition-badge">{childProfile}</span>
             </div>
           </div>
           <section className="neurocard">
-            <div className="card-header"><div><p className="eyebrow">Perfil neurodivergente</p><h2>Resultados del cuestionario</h2></div></div>
+            <div className="card-header"><div><p className="eyebrow">{t('profile.neuroProfile')}</p><h2>{t('profile.questionnaireResults')}</h2></div></div>
             <div className="bar-list">
               {profileAreaValues.map((area) => (
                 <div key={area.label} className="bar-row">
@@ -323,21 +327,21 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
           </section>
           <section className="chip-section">
             <div>
-              <p className="eyebrow">Fortalezas</p>
+              <p className="eyebrow">{t('profile.strengths')}</p>
               <div className="chip-group">{strengths.map((item) => (<span key={item} className="chip chip-green">{item}</span>))}</div>
             </div>
             <div>
-              <p className="eyebrow">Áreas de apoyo</p>
+              <p className="eyebrow">{t('profile.supportAreas')}</p>
               <div className="chip-group">{supportAreas.map((item) => (<span key={item} className="chip chip-purple">{item}</span>))}</div>
             </div>
           </section>
           <div className="profile-actions">
-            <button className="secondary-button">Editar perfil</button>
-            <button className="primary-button">Compartir con terapeuta</button>
+            <button className="secondary-button">{t('profile.editProfile')}</button>
+            <button className="primary-button">{t('profile.shareTherapist')}</button>
           </div>
           <section className="history-section">
-            <div className="section-header"><div><p className="eyebrow">Historial de evaluaciones</p><h2>Registros recientes</h2></div></div>
-            <ul className="history-list"><li className="history-item"><strong>Cuestionario inicial</strong><span>Reciente</span></li></ul>
+            <div className="section-header"><div><p className="eyebrow">{t('profile.history')}</p><h2>{t('profile.recentRecords')}</h2></div></div>
+            <ul className="history-list"><li className="history-item"><strong>{t('profile.initialQuestionnaire')}</strong><span>{t('profile.recent')}</span></li></ul>
           </section>
         </section>
       ) : activeTab === 'cuenta' ? (
@@ -347,22 +351,35 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
             <div><h2>{parentName}</h2><p>{parentEmail}</p></div>
           </div>
           <section className="plan-card plan-free">
-            <div className="plan-card-header"><p className="eyebrow">Plan actual</p><h2>Plan Gratuito</h2></div>
-            <ul className="plan-list"><li>Limitación a 1 perfil</li><li>Acceso básico a actividades</li><li>Sin reportes PDF</li><li>Incluye anuncios suaves</li><li>Soporte estándar</li></ul>
+            <div className="plan-card-header"><p className="eyebrow">{t('account.planCurrent')}</p><h2>{t('account.planFreeTitle')}</h2></div>
+            <ul className="plan-list"><li>{t('account.free1')}</li><li>{t('account.free2')}</li><li>{t('account.free3')}</li><li>{t('account.free4')}</li><li>{t('account.free5')}</li></ul>
           </section>
           <section className="plan-card plan-premium">
-            <div className="plan-card-header"><p className="eyebrow">Plan Familiar</p><h2>$14.99/mes</h2><p className="plan-subtitle">o $109/año (ahorra 39%)</p></div>
-            <ul className="plan-list"><li>Perfiles ilimitados</li><li>Todas las actividades desbloqueadas</li><li>Reportes PDF descargables</li><li>Sin anuncios</li><li>Soporte prioritario</li></ul>
-            <button className="primary-button upgrade-button">Actualizar a Plan Familiar</button>
+            <div className="plan-card-header"><p className="eyebrow">{t('account.familyEyebrow')}</p><h2>{t('account.familyPrice')}</h2><p className="plan-subtitle">{t('account.familySubtitle')}</p></div>
+            <ul className="plan-list"><li>{t('account.premium1')}</li><li>{t('account.premium2')}</li><li>{t('account.premium3')}</li><li>{t('account.premium4')}</li><li>{t('account.premium5')}</li></ul>
+            <button className="primary-button upgrade-button">{t('account.upgradeFamily')}</button>
           </section>
           <section className="settings-section">
-            <div className="section-header"><div><p className="eyebrow">Configuración</p><h2>Ajustes rápidos</h2></div></div>
-            <div className="setting-item">Notificaciones</div>
-            <div className="setting-item">Idioma</div>
-            <div className="setting-item">Privacidad</div>
+            <div className="section-header"><div><p className="eyebrow">{t('account.settingsEyebrow')}</p><h2>{t('account.quickSettings')}</h2></div></div>
+            <div className="setting-item">{t('account.notifications')}</div>
+            <button
+              type="button"
+              className="setting-item"
+              onClick={() => setShowLangPanel((value) => !value)}
+              style={{ width: '100%', textAlign: 'left', border: 'none', background: 'transparent', cursor: 'pointer', font: 'inherit' }}
+            >
+              {t('account.language')}
+              <span style={{ float: 'right' }}>{showLangPanel ? '▲' : '▼'}</span>
+            </button>
+            {showLangPanel && (
+              <div style={{ padding: '12px 4px' }}>
+                <LanguageSwitcher />
+              </div>
+            )}
+            <div className="setting-item">{t('account.privacy')}</div>
           </section>
-          <section className="share-section"><button className="secondary-button share-button"><span>🔗</span> Compartir NeuroBright</button></section>
-          <button className="signout-red-button" onClick={onSignOut}>Cerrar sesión</button>
+          <section className="share-section"><button className="secondary-button share-button"><span>🔗</span> {t('account.share')}</button></section>
+          <button className="signout-red-button" onClick={onSignOut}>{t('common.signOut')}</button>
         </section>
       ) : (
         <>
@@ -370,23 +387,23 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
             <div className="profile-row">
               <div className="avatar-circle">{childInitial}</div>
               <div>
-                <p className="profile-label">Perfil del hijo/a</p>
-                <h2>{childName}{childAge ? `, ${childAge} años` : ''}</h2>
-                <p className="profile-condition">{childProfile ? `Perfil detectado: ${childProfile}` : 'Perfil en evaluación'}</p>
+                <p className="profile-label">{t('home.childProfile')}</p>
+                <h2>{childName}{childAge ? `, ${childAge} ${t('common.years')}` : ''}</h2>
+                <p className="profile-condition">{childProfile ? `${t('home.detectedProfile')}: ${childProfile}` : t('home.profileEvaluating')}</p>
               </div>
             </div>
             <div className="profile-stats">
-              <div><span>Edad</span><strong>{childAge ?? '-'}</strong></div>
-              <div><span>Perfil</span><strong>{childProfile || 'No disponible'}</strong></div>
-              <div><span>Objetivo</span><strong>{dashboardObjective}</strong></div>
+              <div><span>{t('home.age')}</span><strong>{childAge ?? '-'}</strong></div>
+              <div><span>{t('home.profile')}</span><strong>{childProfile || t('common.notAvailable')}</strong></div>
+              <div><span>{t('home.objective')}</span><strong>{dashboardObjective}</strong></div>
             </div>
           </section>
 
           <section className="activity-section">
-            <div className="section-header"><div><p className="eyebrow">Recomendado para hoy</p><h2>Qué hacer ahora</h2></div></div>
+            <div className="section-header"><div><p className="eyebrow">{t('home.recommended')}</p><h2>{t('home.whatToDo')}</h2></div></div>
             <div className="activity-list">
               {recommended.length === 0 ? (
-                <p style={{ color: '#6b6b85' }}>¡Completaste las actividades de hoy! 🎉 Vuelve mañana para seguir avanzando.</p>
+                <p style={{ color: '#6b6b85' }}>{t('home.allDone')}</p>
               ) : (
                 recommended.map((activity) => (
                   <button key={activity.title} className="activity-item" onClick={() => setActiveActivity(activity)} style={{ width: '100%', textAlign: 'left', border: 'none', background: 'transparent', cursor: 'pointer' }}>
@@ -399,11 +416,11 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
           </section>
 
           <section className="progress-section">
-            <div className="section-header"><div><p className="eyebrow">Progreso semanal</p><h2>Avance actual</h2></div></div>
+            <div className="section-header"><div><p className="eyebrow">{t('home.weeklyProgress')}</p><h2>{t('home.currentProgress')}</h2></div></div>
             <div className="progress-card">
               <div className="progress-label-row">
-                <span>{progressPct}% cumplido</span>
-                <strong>{completedThisWeek.length}/{weeklyGoal} objetivos</strong>
+                <span>{progressPct}% {t('home.completed')}</span>
+                <strong>{completedThisWeek.length}/{weeklyGoal} {t('home.goals')}</strong>
               </div>
               <div className="progress-bar">
                 <span className="progress-fill" style={{ width: `${progressPct}%` }} />
@@ -418,7 +435,6 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
         </>
       )}
 
-      <button className="fab-button" aria-label="Agregar registro del día">+</button>
 
       {activeActivity && (
         <ActivityScreen
@@ -432,10 +448,10 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
       )}
 
       <nav className="bottom-nav" aria-label="Barra de navegación">
-        {Object.entries(tabLabels).map(([tab, label]) => (
-          <button key={tab} className={activeTab === tab ? 'nav-item active' : 'nav-item'} onClick={() => setActiveTab(tab as Tab)}>
+        {(Object.keys(tabLabels) as Tab[]).map((tab) => (
+          <button key={tab} className={activeTab === tab ? 'nav-item active' : 'nav-item'} onClick={() => setActiveTab(tab)}>
             <span className="nav-icon">{tab === 'inicio' ? '🏠' : tab === 'perfil' ? '👤' : tab === 'actividades' ? '🗂️' : tab === 'progreso' ? '📊' : '⚙️'}</span>
-            <span>{label}</span>
+            <span>{t(`nav.${tab}`)}</span>
           </button>
         ))}
       </nav>
