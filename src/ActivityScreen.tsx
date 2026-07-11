@@ -575,36 +575,52 @@ function getMovesForAge(age: number | undefined, lang: string): Move[] {
 function MovementRoutine({ activity, onClose, onComplete, childAge }: BodyProps) {
   const { t, lang } = useTranslation();
   const moves = getMovesForAge(childAge, lang);
-  const [phase, setPhase] = useState<'intro' | 'running' | 'done'>('intro');
+  const [phase, setPhase] = useState<'intro' | 'countdown' | 'running' | 'rest' | 'done'>('intro');
   const [index, setIndex] = useState(0);
-  const [secondsLeft, setSecondsLeft] = useState(moves[0].seconds);
+  const [countdownNum, setCountdownNum] = useState(3);
+  const [secondsLeft, setSecondsLeft] = useState(20);
   const [running, setRunning] = useState(false);
   const intervalRef = useRef<number | null>(null);
 
+  // Cada ejercicio dura ~20s; el último (calma final) un poco más.
+  const moveSeconds = (i: number) => (i === moves.length - 1 ? 25 : 20);
+  const isLast = index + 1 >= moves.length;
+
+  // Cuenta regresiva 3-2-1 antes de cada ejercicio
   useEffect(() => {
-    if (!running || phase !== 'running') return;
+    if (phase !== 'countdown') return;
+    if (countdownNum <= 0) {
+      setSecondsLeft(moveSeconds(index));
+      setRunning(true);
+      setPhase('running');
+      return;
+    }
+    const id = window.setTimeout(() => setCountdownNum((n) => n - 1), 800);
+    return () => window.clearTimeout(id);
+  }, [phase, countdownNum, index]);
+
+  // Temporizador del ejercicio
+  useEffect(() => {
+    if (phase !== 'running' || !running) return;
     intervalRef.current = window.setInterval(() => {
       setSecondsLeft((s) => Math.max(s - 1, 0));
     }, 1000);
     return () => { if (intervalRef.current) window.clearInterval(intervalRef.current); };
-  }, [running, phase]);
+  }, [phase, running]);
 
+  // Al terminar el tiempo: pasa a "descanso" (NO salta solo al siguiente)
   useEffect(() => {
-    if (phase !== 'running' || !running || secondsLeft > 0) return;
-    if (index + 1 >= moves.length) {
+    if (phase === 'running' && secondsLeft === 0) {
       setRunning(false);
-      setPhase('done');
-    } else {
-      const ni = index + 1;
-      setIndex(ni);
-      setSecondsLeft(moves[ni].seconds);
+      setPhase('rest');
     }
-  }, [secondsLeft, phase, running, index, moves]);
+  }, [phase, secondsLeft]);
 
-  const start = () => { setIndex(0); setSecondsLeft(moves[0].seconds); setPhase('running'); setRunning(true); };
-  const skip = () => {
-    if (index + 1 >= moves.length) { setRunning(false); setPhase('done'); }
-    else { const ni = index + 1; setIndex(ni); setSecondsLeft(moves[ni].seconds); }
+  const start = () => { setIndex(0); setCountdownNum(3); setPhase('countdown'); };
+  const goNext = () => {
+    const ni = index + 1;
+    if (ni >= moves.length) { setPhase('done'); }
+    else { setIndex(ni); setCountdownNum(3); setPhase('countdown'); }
   };
 
   if (phase === 'intro') {
@@ -615,6 +631,41 @@ function MovementRoutine({ activity, onClose, onComplete, childAge }: BodyProps)
         </p>
         <p style={{ textAlign: 'center', color: '#2b2b55', fontWeight: 600, marginBottom: 16 }}>{t('act.move.count', { n: moves.length })}</p>
         <button onClick={start} style={primaryBtn(activity.color)}>{t('act.start')}</button>
+        <button onClick={onClose} style={backBtn}>{t('act.back')}</button>
+      </>
+    );
+  }
+
+  if (phase === 'countdown') {
+    const move = moves[index];
+    return (
+      <>
+        <style>{`@keyframes nb-count-pop { 0% { transform: scale(0.4); opacity: 0; } 40% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }`}</style>
+        <p style={{ textAlign: 'center', color: '#6b6b85', fontSize: 14, marginBottom: 4 }}>{t('act.move.getReady')}</p>
+        <div style={{ textAlign: 'center', marginBottom: 6 }}>
+          <div style={{ fontSize: 48 }}>{move.emoji}</div>
+          <h3 style={{ margin: '6px 0 0', color: '#2b2b55' }}>{move.name}</h3>
+        </div>
+        <div key={countdownNum} style={{ fontSize: 96, fontWeight: 800, color: activity.color, textAlign: 'center', lineHeight: 1.1, margin: '4px 0 16px', animation: 'nb-count-pop 0.4s ease' }}>
+          {countdownNum > 0 ? countdownNum : t('act.move.go')}
+        </div>
+        <button onClick={onClose} style={backBtn}>{t('act.back')}</button>
+      </>
+    );
+  }
+
+  if (phase === 'rest') {
+    const move = moves[index];
+    return (
+      <>
+        <div style={{ textAlign: 'center', marginBottom: 12 }}>
+          <div style={{ fontSize: 52 }}>✅</div>
+          <p style={{ color: '#2e9e5b', fontWeight: 700, fontSize: 18, margin: '8px 0 2px' }}>{t('act.move.wellDone')}</p>
+          <p style={{ color: '#6b6b85', margin: 0 }}>{move.name}</p>
+        </div>
+        <button onClick={goNext} style={primaryBtn(activity.color)}>
+          {isLast ? t('act.move.finish') : t('act.move.nextReady')}
+        </button>
         <button onClick={onClose} style={backBtn}>{t('act.back')}</button>
       </>
     );
@@ -635,8 +686,8 @@ function MovementRoutine({ activity, onClose, onComplete, childAge }: BodyProps)
   }
 
   const move = moves[index];
-  const progress = Math.round(((move.seconds - secondsLeft) / move.seconds) * 100);
-
+  const dur = moveSeconds(index);
+  const progress = Math.round(((dur - secondsLeft) / dur) * 100);
   return (
     <>
       <style>{`@keyframes nb-move-bounce { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-10px) scale(1.08); } }`}</style>
@@ -651,7 +702,6 @@ function MovementRoutine({ activity, onClose, onComplete, childAge }: BodyProps)
         <div style={{ height: '100%', width: `${progress}%`, background: activity.color, transition: 'width 0.3s' }} />
       </div>
       <button onClick={() => setRunning((r) => !r)} style={primaryBtn(activity.color)}>{running ? t('act.pause') : t('act.continue')}</button>
-      <button onClick={skip} style={backBtn}>{t('act.move.next')}</button>
       <button onClick={onClose} style={backBtn}>{t('act.back')}</button>
     </>
   );
