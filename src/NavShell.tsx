@@ -15,6 +15,14 @@ type Category = 'Todas' | 'Atención' | 'Calma' | 'Sensorial' | 'Emociones' | 'A
 
 const categories: Category[] = ['Todas', 'Atención', 'Calma', 'Sensorial', 'Emociones', 'Aprendizaje'];
 
+// Etiquetas del pie de enlaces legales (se muestran en el idioma elegido).
+// Las páginas viven en la carpeta public: /terms.html, /privacy.html, /refunds.html
+const LEGAL_LABELS: Record<string, { terms: string; privacy: string; refunds: string }> = {
+  es: { terms: 'Términos', privacy: 'Privacidad', refunds: 'Reembolsos' },
+  en: { terms: 'Terms', privacy: 'Privacy', refunds: 'Refunds' },
+  pt: { terms: 'Termos', privacy: 'Privacidade', refunds: 'Reembolsos' }
+};
+
 const activitiesData = [
   { id: 'breathing', icon: '🌬️', title: 'Respiración 4-7-8', duration: 5, difficulty: 2, category: 'Calma', color: '#4ECDC4', description: 'Guía de respiración para relajar y centrar.' },
   { id: 'memory', icon: '🧠', title: 'Juego de memoria', duration: 12, difficulty: 3, category: 'Atención', color: '#6C63FF', description: 'Ejercicio divertido para fortalecer la concentración.' },
@@ -380,6 +388,14 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
           </section>
           <section className="share-section"><button className="secondary-button share-button"><span>🔗</span> {t('account.share')}</button></section>
           <button className="signout-red-button" onClick={onSignOut}>{t('common.signOut')}</button>
+          <footer className="legal-footer">
+            <a href="/terms.html" target="_blank" rel="noopener noreferrer">{(LEGAL_LABELS[lang] ?? LEGAL_LABELS.es).terms}</a>
+            <span aria-hidden="true"> · </span>
+            <a href="/privacy.html" target="_blank" rel="noopener noreferrer">{(LEGAL_LABELS[lang] ?? LEGAL_LABELS.es).privacy}</a>
+            <span aria-hidden="true"> · </span>
+            <a href="/refunds.html" target="_blank" rel="noopener noreferrer">{(LEGAL_LABELS[lang] ?? LEGAL_LABELS.es).refunds}</a>
+            <style>{`.legal-footer{margin-top:18px;margin-bottom:4px;text-align:center;font-size:13px;color:#94a3b8}.legal-footer a{color:#7c3aed;text-decoration:none;margin:0 2px}.legal-footer a:hover{text-decoration:underline}`}</style>
+          </footer>
         </section>
       ) : (
         <>
