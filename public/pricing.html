@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Precios — NeuroBright</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root { --brand: #6C63FF; --brand2: #4ECDC4; --ink: #2e2452; --muted: #5f5980; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Nunito', system-ui, sans-serif; color: var(--ink);
+      background: radial-gradient(circle at top, rgba(76,207,196,0.16), transparent 34%),
+      linear-gradient(180deg, #ffffff 0%, #f5f3ff 100%); line-height: 1.6; min-height: 100vh; }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 40px 20px 64px; }
+    .brand { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 6px; }
+    .brand .mark { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+      background: linear-gradient(135deg, var(--brand), var(--brand2)); color: #fff; font-size: 24px; }
+    .brand h1 { font-size: 22px; margin: 0; }
+    .lead { text-align: center; color: var(--muted); max-width: 560px; margin: 6px auto 12px; }
+    .disclaimer { text-align: center; color: var(--muted); font-size: 13px; max-width: 620px; margin: 0 auto 32px; }
+    .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 680px) { .plans { grid-template-columns: 1fr; } }
+    .plan { background: #fff; border-radius: 24px; padding: 28px 24px;
+      box-shadow: 0 24px 56px rgba(48,37,89,0.08); border: 1px solid rgba(108,99,255,0.12); }
+    .plan.featured { border: 2px solid var(--brand); position: relative; }
+    .badge { position: absolute; top: -12px; right: 20px; background: linear-gradient(135deg, var(--brand), var(--brand2));
+      color: #fff; font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 999px; }
+    .plan h2 { font-size: 20px; margin: 0 0 4px; }
+    .price { font-size: 34px; font-weight: 800; color: var(--brand); margin: 8px 0 2px; }
+    .price small { font-size: 15px; font-weight: 600; color: var(--muted); }
+    .sub { color: var(--muted); font-size: 14px; margin: 0 0 16px; }
+    ul { list-style: none; padding: 0; margin: 16px 0 0; }
+    li { padding: 7px 0 7px 28px; position: relative; color: var(--muted); }
+    li::before { content: '✓'; position: absolute; left: 0; color: var(--brand2); font-weight: 800; }
+    .foot { text-align: center; margin-top: 32px; color: var(--muted); font-size: 13px; }
+    .foot a { color: var(--brand); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand"><div class="mark">★</div><h1>NeuroBright</h1></div>
+    <p class="lead">Apoyo diario para acompañar el desarrollo de tu peque. Elegí el plan que mejor se adapte a tu familia.</p>
+    <p class="disclaimer">NeuroBright es una herramienta de apoyo educativo. No es un servicio de diagnóstico ni médico.</p>
+
+    <div class="plans">
+      <div class="plan">
+        <h2>Plan Gratuito</h2>
+        <div class="price">$0</div>
+        <p class="sub">Para empezar a acompañar hoy mismo.</p>
+        <ul>
+          <li>1 perfil de niño/a</li>
+          <li>Acceso básico a las actividades</li>
+          <li>Seguimiento de progreso</li>
+          <li>Disponible en español, inglés y portugués</li>
+        </ul>
+      </div>
+
+      <div class="plan featured">
+        <div class="badge">Recomendado</div>
+        <h2>Plan Familiar</h2>
+        <div class="price">$14.99 <small>/ mes</small></div>
+        <p class="sub">o $109 / año (ahorrás cerca de un 39%)</p>
+        <ul>
+          <li>Perfiles ilimitados</li>
+          <li>Todas las actividades desbloqueadas</li>
+          <li>Reportes de progreso descargables (PDF)</li>
+          <li>Sin anuncios</li>
+          <li>Soporte prioritario</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="foot">
+      La suscripción se renueva automáticamente y podés cancelarla cuando quieras. Los pagos se procesan de forma
+      segura a través de Paddle.<br />
+      <a href="/terms.html">Términos y Condiciones</a> ·
+      <a href="/privacy.html">Política de Privacidad</a> ·
+      <a href="/refunds.html">Política de Reembolsos</a>
+    </p>
+  </div>
+</body>
+</html>
