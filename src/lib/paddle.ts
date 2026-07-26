@@ -10,7 +10,7 @@
 const PADDLE_CLIENT_TOKEN = 'live_c30d8a93a6be313ef5864e48eaf';
 
 // Precio real: NeuroBright Premium — Plan Mensual $14.99 USD
-const PADDLE_PRICE_ID = 'pri_01kyfpkcrb8sc2h2kdjjp1rxps';
+const PADDLE_PRICE_ID = 'pri_01kyfwsv34mtsmxr9jzkfn2zt0';
 
 declare global {
   interface Window {
