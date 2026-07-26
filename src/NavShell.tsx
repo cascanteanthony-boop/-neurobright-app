@@ -3,6 +3,7 @@ import type { UserMetadata } from './types';
 import ActivityScreen, { type ActivityInfo } from './ActivityScreen';
 import { supabase } from './lib/supabase';
 import { useTranslation, LanguageSwitcher } from './lib/i18n';
+import { openCheckout } from './lib/paddle';
 
 type Tab = 'inicio' | 'perfil' | 'actividades' | 'progreso' | 'cuenta';
 
@@ -365,7 +366,14 @@ export default function NavShell({ onSignOut, userMetadata }: NavShellProps) {
           <section className="plan-card plan-premium">
             <div className="plan-card-header"><p className="eyebrow">{t('account.familyEyebrow')}</p><h2>{t('account.familyPrice')}</h2><p className="plan-subtitle">{t('account.familySubtitle')}</p></div>
             <ul className="plan-list"><li>{t('account.premium1')}</li><li>{t('account.premium2')}</li><li>{t('account.premium3')}</li><li>{t('account.premium4')}</li><li>{t('account.premium5')}</li></ul>
-            <button className="primary-button upgrade-button">{t('account.upgradeFamily')}</button>
+            <button
+              className="primary-button upgrade-button"
+              onClick={() => {
+                openCheckout(userMetadata.parentEmail, lang).catch(() => {
+                  alert('No se pudo abrir la ventana de pago. Revisa tu conexión e intenta de nuevo.');
+                });
+              }}
+            >{t('account.upgradeFamily')}</button>
           </section>
           <section className="settings-section">
             <div className="section-header"><div><p className="eyebrow">{t('account.settingsEyebrow')}</p><h2>{t('account.quickSettings')}</h2></div></div>
