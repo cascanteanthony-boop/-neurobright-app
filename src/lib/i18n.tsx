@@ -761,9 +761,43 @@ const I18nContext = createContext<I18nContextValue>({
   setLang: () => undefined,
   t: (key, vars) => translate('es', key, vars)
 });
+// Decide el idioma inicial: URL → preferencia guardada → navegador → español.
+function resolveInitialLang(): Lang {
+  const soportados = LANGS.map((l) => l.code) as Lang[];
+  const esValido = (v: unknown): v is Lang =>
+    typeof v === 'string' && soportados.includes(v as Lang);
 
+  if (typeof window !== 'undefined') {
+    // 1. ?lang=es en la URL — es lo que envían los pines
+    try {
+      const desdeUrl = new URLSearchParams(window.location.search).get('lang');
+      if (esValido(desdeUrl)) return desdeUrl;
+    } catch {
+      // Ignoramos si la URL no se puede leer.
+    }
+
+    // 2. Lo que el usuario eligió en una visita anterior
+    try {
+      const guardado = window.localStorage.getItem(STORAGE_KEY);
+      if (esValido(guardado)) return guardado;
+    } catch {
+      // Ignoramos si localStorage está bloqueado.
+    }
+
+    // 3. El idioma del navegador
+    const nav = window.navigator;
+    const idiomas = [...(nav.languages ?? []), nav.language].filter(Boolean);
+    for (const item of idiomas) {
+      const base = String(item).toLowerCase().split('-')[0];
+      if (esValido(base)) return base as Lang;
+    }
+  }
+
+  // 4. Español por defecto
+  return 'es' as Lang;
+}
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(() => readSavedLang());
+  const [lang, setLangState] = useState<Lang>(() => resolveInitialLang());
 
   useEffect(() => {
     try {
