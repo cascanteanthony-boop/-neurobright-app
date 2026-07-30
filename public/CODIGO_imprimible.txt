@@ -1,0 +1,278 @@
+# -*- coding: utf-8 -*-
+"""
+Imprimible gratuito NeuroBright: 12 tarjetas de rutina visual.
+Diseno propio, distinto al de las tarjetas del kit de Hotmart.
+Genera version a color y en blanco y negro, en Carta y A4.
+"""
+import math
+import os
+from reportlab.lib.colors import HexColor, white, black
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
+
+BASE = os.path.dirname(os.path.abspath(__file__))
+FONTS = os.path.join(BASE, "fonts")
+
+VIOLETA = HexColor("#6C62FF")
+LAVANDA = HexColor("#EEE9FF")
+LAV_OSC = HexColor("#DCD3FF")
+AMARILLO = HexColor("#EEA634")
+TURQUESA = HexColor("#27AAA5")
+CORAL = HexColor("#F27A6B")
+TINTA = HexColor("#2A2350")
+GRIS = HexColor("#5A5478")
+
+URL = "neurobright-app.vercel.app"
+
+try:
+    pdfmetrics.registerFont(TTFont("Baloo", os.path.join(FONTS, "Baloo2.ttf")))
+    pdfmetrics.registerFont(TTFont("Nunito", os.path.join(FONTS, "NunitoSans.ttf")))
+    F_TIT, F_TXT = "Baloo", "Nunito"
+except Exception:
+    F_TIT, F_TXT = "Helvetica-Bold", "Helvetica"
+
+TEXTOS = {
+    "es": dict(
+        titulo="Mi rutina de hoy",
+        sub="12 tarjetas de rutina visual para recortar",
+        pasos=["Imprime la hoja a color o en blanco y negro.",
+               "Recorta por la línea punteada y pega velcro o cinta detrás.",
+               "Coloca solo 4 tarjetas al día, a la altura de los ojos del niño."],
+        nota="Empieza con pocas tarjetas. Añade una nueva cada semana, nunca todas de golpe.",
+        pie="Material gratuito de NeuroBright",
+        color="Versión a color", bn="Versión en blanco y negro",
+        recorta="recorta aquí",
+        cards=["Despertar", "Lavarse los dientes", "Bañarse", "Desayunar",
+               "Vestirse", "Ir a la escuela", "Almorzar", "Hacer la tarea",
+               "Jugar", "Guardar los juguetes", "Cenar", "Dormir"]),
+    "pt": dict(
+        titulo="Minha rotina de hoje",
+        sub="12 cartões de rotina visual para recortar",
+        pasos=["Imprima a folha colorida ou em preto e branco.",
+               "Recorte na linha pontilhada e cole velcro ou fita atrás.",
+               "Deixe só 4 cartões por dia, na altura dos olhos da criança."],
+        nota="Comece com poucos cartões. Acrescente um por semana, nunca todos de uma vez.",
+        pie="Material gratuito da NeuroBright",
+        color="Versão colorida", bn="Versão em preto e branco",
+        recorta="recorte aqui",
+        cards=["Acordar", "Escovar os dentes", "Tomar banho", "Café da manhã",
+               "Vestir-se", "Ir para a escola", "Almoçar", "Fazer a tarefa",
+               "Brincar", "Guardar os brinquedos", "Jantar", "Dormir"]),
+}
+
+ICONOS = ["sol", "cepillo", "gota", "plato", "camiseta", "mochila",
+          "manzana", "libro", "pelota", "caja", "taza", "luna"]
+COLORES = [AMARILLO, TURQUESA, VIOLETA, CORAL, TURQUESA, VIOLETA,
+           CORAL, AMARILLO, TURQUESA, VIOLETA, CORAL, VIOLETA]
+
+
+# ------------------------------------------------------------------ iconos
+def icono(c, cx, cy, r, tipo, col, bn=False):
+    """Dibuja un icono centrado en (cx, cy) dentro de un radio r."""
+    relleno = None if bn else col
+    trazo = black if bn else col
+    c.setLineWidth(r * 0.13)
+    c.setStrokeColor(trazo)
+    if relleno:
+        c.setFillColor(relleno)
+
+    def forma(p, cerrar=True, modo=None):
+        path = c.beginPath()
+        path.moveTo(*p[0])
+        for pt in p[1:]:
+            path.lineTo(*pt)
+        if cerrar:
+            path.close()
+        c.drawPath(path, stroke=1, fill=0 if bn else 1)
+
+    if tipo == "sol":
+        c.circle(cx, cy, r * 0.42, stroke=1, fill=0 if bn else 1)
+        for k in range(8):
+            a = k * math.pi / 4
+            c.line(cx + r * 0.60 * math.cos(a), cy + r * 0.60 * math.sin(a),
+                   cx + r * 0.92 * math.cos(a), cy + r * 0.92 * math.sin(a))
+    elif tipo == "cepillo":
+        c.roundRect(cx - r * 0.14, cy - r * 0.90, r * 0.28, r * 1.30,
+                    r * 0.12, stroke=1, fill=0 if bn else 1)
+        c.roundRect(cx - r * 0.34, cy + r * 0.36, r * 0.68, r * 0.52,
+                    r * 0.16, stroke=1, fill=0 if bn else 1)
+    elif tipo == "gota":
+        forma([(cx, cy + r * 0.92), (cx + r * 0.62, cy - r * 0.10),
+               (cx - r * 0.62, cy - r * 0.10)])
+        c.circle(cx, cy - r * 0.12, r * 0.62, stroke=1, fill=0 if bn else 1)
+    elif tipo == "plato":
+        c.circle(cx, cy, r * 0.88, stroke=1, fill=0 if bn else 1)
+        c.setFillColor(white)
+        c.setStrokeColor(trazo)
+        c.circle(cx, cy, r * 0.45, stroke=1, fill=1)
+    elif tipo == "camiseta":
+        forma([(cx - r * 0.34, cy + r * 0.82), (cx - r * 0.88, cy + r * 0.34),
+               (cx - r * 0.62, cy + r * 0.02), (cx - r * 0.48, cy + r * 0.20),
+               (cx - r * 0.48, cy - r * 0.88), (cx + r * 0.48, cy - r * 0.88),
+               (cx + r * 0.48, cy + r * 0.20), (cx + r * 0.62, cy + r * 0.02),
+               (cx + r * 0.88, cy + r * 0.34), (cx + r * 0.34, cy + r * 0.82),
+               (cx, cy + r * 0.56)])
+    elif tipo == "mochila":
+        c.roundRect(cx - r * 0.66, cy - r * 0.88, r * 1.32, r * 1.46,
+                    r * 0.30, stroke=1, fill=0 if bn else 1)
+        c.setFillColor(white)
+        c.roundRect(cx - r * 0.30, cy - r * 0.52, r * 0.60, r * 0.44,
+                    r * 0.10, stroke=1, fill=1)
+        c.setStrokeColor(trazo)
+        c.arc(cx - r * 0.38, cy + r * 0.20, cx + r * 0.38, cy + r * 0.96, 0, 180)
+    elif tipo == "manzana":
+        c.circle(cx, cy - r * 0.16, r * 0.76, stroke=1, fill=0 if bn else 1)
+        c.setLineWidth(r * 0.16)
+        c.line(cx, cy + r * 0.50, cx, cy + r * 0.92)
+    elif tipo == "libro":
+        c.roundRect(cx - r * 0.78, cy - r * 0.66, r * 1.56, r * 1.32,
+                    r * 0.12, stroke=1, fill=0 if bn else 1)
+        c.setFillColor(white)
+        c.rect(cx - r * 0.07, cy - r * 0.58, r * 0.14, r * 1.16, stroke=1, fill=1)
+    elif tipo == "pelota":
+        c.circle(cx, cy, r * 0.86, stroke=1, fill=0 if bn else 1)
+        c.setStrokeColor(white if not bn else black)
+        c.setLineWidth(r * 0.12)
+        c.line(cx - r * 0.86, cy, cx + r * 0.86, cy)
+        c.arc(cx - r * 1.40, cy - r * 0.86, cx + r * 0.10, cy + r * 0.86, 270, 180)
+        c.arc(cx - r * 0.10, cy - r * 0.86, cx + r * 1.40, cy + r * 0.86, 90, 180)
+    elif tipo == "caja":
+        c.roundRect(cx - r * 0.82, cy - r * 0.74, r * 1.64, r * 1.16,
+                    r * 0.10, stroke=1, fill=0 if bn else 1)
+        c.roundRect(cx - r * 0.92, cy + r * 0.38, r * 1.84, r * 0.42,
+                    r * 0.10, stroke=1, fill=0 if bn else 1)
+    elif tipo == "taza":
+        c.roundRect(cx - r * 0.62, cy - r * 0.70, r * 1.10, r * 1.24,
+                    r * 0.14, stroke=1, fill=0 if bn else 1)
+        c.setLineWidth(r * 0.15)
+        c.setStrokeColor(trazo)
+        c.arc(cx + r * 0.28, cy - r * 0.34, cx + r * 0.96, cy + r * 0.24, 270, 180)
+    elif tipo == "luna":
+        p = c.beginPath()
+        p.moveTo(cx + r * 0.30, cy - r * 0.85)
+        p.arcTo(cx - r * 0.88, cy - r * 0.88, cx + r * 0.88, cy + r * 0.88, -70, 250)
+        p.arcTo(cx - r * 0.30, cy - r * 0.72, cx + r * 1.24, cy + r * 0.72, 115, -230)
+        p.close()
+        c.drawPath(p, stroke=1, fill=0 if bn else 1)
+
+
+# ------------------------------------------------------------------ paginas
+def portada(c, W, H, T):
+    c.setFillColor(VIOLETA)
+    c.rect(0, H - 150, W, 150, stroke=0, fill=1)
+    c.setFillColor(white)
+    c.roundRect(52, H - 112, 34, 34, 10, stroke=0, fill=1)
+    c.setFillColor(VIOLETA)
+    c.setFont(F_TIT, 24)
+    c.drawCentredString(69, H - 104, "N")
+    c.setFillColor(white)
+    c.setFont(F_TIT, 15)
+    c.drawString(98, H - 101, "NeuroBright")
+
+    c.setFillColor(white)
+    c.setFont(F_TIT, 30)
+    c.drawString(52, H - 62, T["titulo"])
+
+    c.setFillColor(TINTA)
+    c.setFont(F_TIT, 17)
+    c.drawString(52, H - 200, T["sub"])
+
+    y = H - 246
+    for i, paso in enumerate(T["pasos"]):
+        c.setFillColor([TURQUESA, VIOLETA, AMARILLO][i])
+        c.circle(62, y + 4, 11, stroke=0, fill=1)
+        c.setFillColor(white)
+        c.setFont(F_TIT, 12)
+        c.drawCentredString(62, y, str(i + 1))
+        c.setFillColor(GRIS)
+        c.setFont(F_TXT, 12)
+        c.drawString(84, y, paso)
+        y -= 34
+
+    c.setFillColor(LAVANDA)
+    c.roundRect(52, y - 46, W - 104, 52, 12, stroke=0, fill=1)
+    c.setFillColor(TINTA)
+    c.setFont(F_TXT, 11)
+    c.drawString(70, y - 16, T["nota"])
+
+    # muestra de una tarjeta
+    ancho = (W - 104 - 24) / 3
+    tarjeta(c, W / 2 - ancho / 2, y - 220, ancho, 150, "sol", AMARILLO,
+            T["cards"][0], False, T["recorta"], muestra=True)
+
+    c.setFillColor(GRIS)
+    c.setFont(F_TXT, 9.5)
+    c.drawString(52, 44, T["pie"])
+    c.drawRightString(W - 52, 44, URL)
+
+
+def tarjeta(c, x, y, w, h, tipo, col, etiqueta, bn, recorta, muestra=False):
+    c.setDash(2, 3)
+    c.setLineWidth(0.6)
+    c.setStrokeColor(HexColor("#B9B3D6") if not bn else HexColor("#999999"))
+    c.setFillColor(white)
+    c.roundRect(x, y, w, h, 8, stroke=1, fill=1)
+    c.setDash()
+
+    if not bn:
+        c.setFillColor(LAVANDA)
+        c.setStrokeColor(LAVANDA)
+        c.roundRect(x + 7, y + 7, w - 14, h - 14, 6, stroke=0, fill=1)
+
+    icono(c, x + w / 2, y + h * 0.60, min(w, h) * 0.26, tipo, col, bn)
+
+    c.setFillColor(TINTA if not bn else black)
+    cuerpo = 10.5
+    while cuerpo > 6.5 and c.stringWidth(etiqueta, F_TIT, cuerpo) > w - 18:
+        cuerpo -= 0.25          # reduce, nunca recorta la palabra
+    c.setFont(F_TIT, cuerpo)
+    c.drawCentredString(x + w / 2, y + h * 0.16, etiqueta)
+
+
+def hoja_tarjetas(c, W, H, T, bn):
+    c.setFillColor(TINTA if bn else VIOLETA)
+    c.setFont(F_TIT, 13)
+    c.drawString(40, H - 46, T["titulo"] + " · " + (T["bn"] if bn else T["color"]))
+    c.setFillColor(GRIS)
+    c.setFont(F_TXT, 9)
+    c.drawRightString(W - 40, H - 46, URL)
+
+    mx, my, gap = 40, 58, 10
+    cols, rows = 3, 4
+    w = (W - 2 * mx - (cols - 1) * gap) / cols
+    h = (H - my - 70 - (rows - 1) * gap) / rows
+    for i in range(12):
+        cx = mx + (i % cols) * (w + gap)
+        cy = H - 70 - ((i // cols) + 1) * h - (i // cols) * gap
+        tarjeta(c, cx, cy, w, h, ICONOS[i], COLORES[i], T["cards"][i], bn, T["recorta"])
+
+    c.setFillColor(GRIS)
+    c.setFont(F_TXT, 8.5)
+    c.drawCentredString(W / 2, 34, T["recorta"].upper() + " · " + T["pie"])
+
+
+def construir(ruta, idioma, tamano):
+    W, H = tamano
+    T = TEXTOS[idioma]
+    c = canvas.Canvas(ruta, pagesize=tamano)
+    c.setTitle(T["titulo"] + " · NeuroBright")
+    c.setAuthor("NeuroBright")
+    portada(c, W, H, T)
+    c.showPage()
+    hoja_tarjetas(c, W, H, T, bn=False)
+    c.showPage()
+    hoja_tarjetas(c, W, H, T, bn=True)
+    c.showPage()
+    c.save()
+    return ruta
+
+
+if __name__ == "__main__":
+    os.makedirs("imprimibles", exist_ok=True)
+    for idi, nom in (("es", "ES"), ("pt", "PT")):
+        for tam, tnom in ((letter, "Carta"), (A4, "A4")):
+            r = f"imprimibles/Tarjetas_Rutina_NeuroBright_{nom}_{tnom}.pdf"
+            construir(r, idi, tam)
+            print("  ", r)
